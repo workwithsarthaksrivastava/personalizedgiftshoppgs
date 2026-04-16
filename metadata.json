@@ -1,0 +1,6 @@
+{
+  "name": "Personalized Gift Shop",
+  "description": "Premium custom photo frames, UV prints, and personalized gifts by Surya Film Services.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["E-Commerce", "Custom Product Preview", "Admin Dashboard"]
+}
