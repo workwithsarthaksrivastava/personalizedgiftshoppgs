@@ -4,9 +4,8 @@ const supabaseUrl = ((import.meta as any).env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = ((import.meta as any).env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
-  console.error('Supabase configuration is missing or invalid!');
-  console.info('Current URL:', supabaseUrl || 'NOT SET');
-  console.info('Current Key length:', supabaseAnonKey ? supabaseAnonKey.length : 'NOT SET');
+  const msg = 'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables (Secrets panel in AI Studio or Environment Variables in Vercel).';
+  console.error(msg);
 }
 
 export const supabase = createClient(

@@ -39,17 +39,24 @@ export default function Customize() {
   const [loading, setLoading] = useState(true);
   const addItem = useCartStore((state) => state.addItem);
 
+  // Cleanup object URL to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (uploadedImage && uploadedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedImage);
+      }
+    };
+  }, [uploadedImage]);
+
   useEffect(() => {
     const fetchFrames = async () => {
       const timeout = setTimeout(() => {
         if (loading) {
           setLoading(false);
-          toast.error('Loading is taking longer than expected. Please refresh.');
         }
-      }, 10000); // 10 second timeout
+      }, 10000);
 
       try {
-        // Only select necessary fields to speed up the query
         const { data, error } = await supabase
           .from('custom_frames')
           .select('id, name, category, class_name, price, image_url')
@@ -62,7 +69,6 @@ export default function Customize() {
         }
       } catch (error) {
         console.error('Error fetching frames:', error);
-        toast.error('Failed to load frame styles');
       } finally {
         clearTimeout(timeout);
         setLoading(false);
@@ -71,16 +77,21 @@ export default function Customize() {
     fetchFrames();
   }, []);
 
-  const filteredFrames = activeCategory === 'All' 
-    ? frames 
-    : frames.filter(f => f.category === activeCategory);
+  const filteredFrames = React.useMemo(() => {
+    return activeCategory === 'All' 
+      ? frames 
+      : frames.filter(f => f.category === activeCategory);
+  }, [frames, activeCategory]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setUploadedImage(reader.result as string);
-      reader.readAsDataURL(file);
+      // Use ObjectURL instead of Base64 for massive performance gain
+      if (uploadedImage && uploadedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedImage);
+      }
+      const url = URL.createObjectURL(file);
+      setUploadedImage(url);
     }
   };
 
@@ -149,9 +160,10 @@ export default function Customize() {
                       <motion.img 
                         src={uploadedImage} 
                         style={{ scale: zoom, rotate: `${rotation}deg` }}
-                        className="w-full h-full object-cover cursor-move"
+                        className="w-full h-full object-cover cursor-move will-change-transform"
                         drag
-                        dragConstraints={{ left: -200, right: 200, top: -200, bottom: 200 }}
+                        dragMomentum={false}
+                        dragConstraints={{ left: -400, right: 400, top: -400, bottom: 400 }}
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-muted/30 gap-4 bg-white/5">

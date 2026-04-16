@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Package, 
@@ -361,84 +361,11 @@ const FramesManagement = () => {
     }
   };
 
-  const handleRestoreDefaults = async () => {
-    const defaultFrames = [
-      // Wood
-      { name: 'Natural Oak', category: 'Wood', class_name: 'border-[16px] border-[#d2b48c] shadow-xl', price: 450 },
-      { name: 'Dark Walnut', category: 'Wood', class_name: 'border-[16px] border-[#3d2b1f] shadow-xl', price: 550 },
-      { name: 'Rustic Pine', category: 'Wood', class_name: 'border-[16px] border-[#a0522d] shadow-inner shadow-xl', price: 400 },
-      { name: 'Ebony Wood', category: 'Wood', class_name: 'border-[16px] border-[#1a1a1a] shadow-xl', price: 600 },
-      { name: 'Mahogany', category: 'Wood', class_name: 'border-[16px] border-[#4a0e0e] shadow-xl', price: 650 },
-      { name: 'Cherry Wood', category: 'Wood', class_name: 'border-[16px] border-[#8b0000] shadow-xl', price: 500 },
-      { name: 'Teak Finish', category: 'Wood', class_name: 'border-[16px] border-[#cd853f] shadow-xl', price: 480 },
-      { name: 'Weathered Grey', category: 'Wood', class_name: 'border-[16px] border-[#808080] shadow-xl', price: 420 },
-      { name: 'Bamboo', category: 'Wood', class_name: 'border-[16px] border-[#f5deb3] border-double shadow-xl', price: 450 },
-      { name: 'Birch', category: 'Wood', class_name: 'border-[16px] border-[#fdf5e6] shadow-xl', price: 400 },
-      // Metal
-      { name: 'Polished Gold', category: 'Metal', class_name: 'border-[12px] border-[#ffd700] shadow-[0_0_20px_rgba(255,215,0,0.3)]', price: 850 },
-      { name: 'Brushed Silver', category: 'Metal', class_name: 'border-[12px] border-[#c0c0c0] shadow-xl', price: 750 },
-      { name: 'Rose Gold', category: 'Metal', class_name: 'border-[12px] border-[#b76e79] shadow-xl', price: 900 },
-      { name: 'Matte Black', category: 'Metal', class_name: 'border-[12px] border-[#000000] shadow-xl', price: 500 },
-      { name: 'Copper Glow', category: 'Metal', class_name: 'border-[12px] border-[#b87333] shadow-xl', price: 800 },
-      { name: 'Gunmetal', category: 'Metal', class_name: 'border-[12px] border-[#2a3439] shadow-xl', price: 700 },
-      { name: 'Champagne', category: 'Metal', class_name: 'border-[12px] border-[#f7e7ce] shadow-xl', price: 850 },
-      { name: 'Titanium', category: 'Metal', class_name: 'border-[12px] border-[#878681] shadow-xl', price: 950 },
-      { name: 'Bronze Antique', category: 'Metal', class_name: 'border-[12px] border-[#cd7f32] shadow-xl', price: 780 },
-      { name: 'Chrome', category: 'Metal', class_name: 'border-[12px] border-[#e5e4e2] shadow-2xl', price: 800 },
-      // Ornate
-      { name: 'Baroque Gold', category: 'Ornate', class_name: 'border-[24px] border-[#ffd700] outline outline-4 outline-offset-[-12px] outline-[#b8860b] shadow-2xl', price: 1500 },
-      { name: 'Victorian White', category: 'Ornate', class_name: 'border-[24px] border-[#f5f5f5] outline outline-2 outline-offset-[-8px] outline-[#ddd] shadow-xl', price: 1200 },
-      { name: 'Royal Velvet', category: 'Ornate', class_name: 'border-[20px] border-[#4b0082] border-double shadow-2xl', price: 1350 },
-      { name: 'Vintage Silver', category: 'Ornate', class_name: 'border-[20px] border-[#a9a9a9] border-dotted shadow-xl', price: 1100 },
-      { name: 'Imperial Red', category: 'Ornate', class_name: 'border-[20px] border-[#800000] outline outline-4 outline-offset-[-10px] outline-[#ffd700] shadow-2xl', price: 1600 },
-      { name: 'Gothic Black', category: 'Ornate', class_name: 'border-[20px] border-[#000] outline outline-2 outline-offset-[-6px] outline-[#333] shadow-2xl', price: 1400 },
-      { name: 'Renaissance', category: 'Ornate', class_name: 'border-[24px] border-[#8b4513] outline outline-4 outline-offset-[-12px] outline-[#cd853f] shadow-2xl', price: 1550 },
-      { name: 'Classic Museum', category: 'Ornate', class_name: 'border-[30px] border-[#000] border-double shadow-2xl', price: 1800 },
-      { name: 'Golden Leaf', category: 'Ornate', class_name: 'border-[20px] border-[#daa520] shadow-[0_0_30px_rgba(218,165,32,0.4)]', price: 1700 },
-      { name: 'Antique Ivory', category: 'Ornate', class_name: 'border-[20px] border-[#fffff0] outline outline-1 outline-offset-[-4px] outline-[#eee] shadow-xl', price: 1250 },
-      // Modern
-      { name: 'Floating Glass', category: 'Modern', class_name: 'p-8 bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl', price: 900 },
-      { name: 'Neon Pulse', category: 'Modern', class_name: 'border-4 border-gold shadow-[0_0_20px_#d4af37]', price: 700 },
-      { name: 'Minimalist White', category: 'Modern', class_name: 'border-[4px] border-white shadow-sm', price: 300 },
-      { name: 'Deep Shadow', category: 'Modern', class_name: 'border-none shadow-[20px_20px_60px_#000,-20px_-20px_60px_#111]', price: 500 },
-      { name: 'Acrylic Clear', category: 'Modern', class_name: 'border-[20px] border-white/30 backdrop-blur-sm shadow-xl', price: 1100 },
-      { name: 'Industrial Steel', category: 'Modern', class_name: 'border-[12px] border-[#4682b4] shadow-inner', price: 650 },
-      { name: 'Geometric', category: 'Modern', class_name: 'border-[8px] border-gold border-dashed', price: 450 },
-      { name: 'Futuristic', category: 'Modern', class_name: 'border-[2px] border-gold shadow-[0_0_15px_rgba(212,175,55,0.5)] rounded-lg', price: 800 },
-      { name: 'Soft Glow', category: 'Modern', class_name: 'border-none shadow-[0_0_40px_rgba(255,255,255,0.1)]', price: 400 },
-      { name: 'Edge Light', category: 'Modern', class_name: 'border-r-4 border-b-4 border-gold shadow-xl', price: 550 },
-      // Colorful
-      { name: 'Vibrant Red', category: 'Colorful', class_name: 'border-[16px] border-[#ff0000] shadow-xl', price: 400 },
-      { name: 'Ocean Blue', category: 'Colorful', class_name: 'border-[16px] border-[#0000ff] shadow-xl', price: 400 },
-      { name: 'Emerald Green', category: 'Colorful', class_name: 'border-[16px] border-[#50c878] shadow-xl', price: 400 },
-      { name: 'Sunshine Yellow', category: 'Colorful', class_name: 'border-[16px] border-[#ffff00] shadow-xl', price: 400 },
-      { name: 'Royal Purple', category: 'Colorful', class_name: 'border-[16px] border-[#800080] shadow-xl', price: 400 },
-      { name: 'Hot Pink', category: 'Colorful', class_name: 'border-[16px] border-[#ff69b4] shadow-xl', price: 400 },
-      { name: 'Orange Zest', category: 'Colorful', class_name: 'border-[16px] border-[#ffa500] shadow-xl', price: 400 },
-      { name: 'Mint Fresh', category: 'Colorful', class_name: 'border-[16px] border-[#98ff98] shadow-xl', price: 400 },
-      { name: 'Lavender', category: 'Colorful', class_name: 'border-[16px] border-[#e6e6fa] shadow-xl', price: 400 },
-      { name: 'Coral', category: 'Colorful', class_name: 'border-[16px] border-[#ff7f50] shadow-xl', price: 400 },
-    ];
-
-    const { error } = await supabase.from('custom_frames').insert(defaultFrames);
-    if (error) toast.error(error.message);
-    else {
-      toast.success('50 Default frames restored!');
-      fetchFrames();
-    }
-  };
-
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap justify-between items-center gap-4">
         <h2 className="text-3xl font-bold text-gold">Frame Studio Management</h2>
         <div className="flex gap-4">
-          <button 
-            onClick={handleRestoreDefaults}
-            className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-border text-white font-bold rounded-xl hover:bg-white/10 transition-all"
-          >
-            <RotateCcw className="w-5 h-5" /> Restore 50 Defaults
-          </button>
           <button 
             onClick={() => { setIsAdding(true); setEditingFrame(null); }}
             className="flex items-center gap-2 px-6 py-3 gold-gradient text-bg font-bold rounded-xl hover:scale-105 transition-transform"
@@ -539,7 +466,7 @@ const FramesManagement = () => {
               <p className="text-sm">₹{frame.price}</p>
             </div>
             
-            <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
               <button 
                 onClick={() => {
                   setEditingFrame(frame);
@@ -647,6 +574,7 @@ const OrdersManagement = () => {
 export default function Admin() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -688,12 +616,12 @@ export default function Admin() {
   if (isAdmin === null) return <div className="min-h-screen bg-bg" />;
 
   const sidebarLinks = [
-    { name: 'Dashboard', path: '', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { name: 'Products', path: 'products', icon: <Package className="w-5 h-5" /> },
-    { name: 'Frame Studio', path: 'frames', icon: <FrameIcon className="w-5 h-5" /> },
-    { name: 'Orders', path: 'orders', icon: <ShoppingCart className="w-5 h-5" /> },
-    { name: 'Customers', path: 'customers', icon: <Users className="w-5 h-5" /> },
-    { name: 'Settings', path: 'settings', icon: <Settings className="w-5 h-5" /> },
+    { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { name: 'Products', path: '/admin/products', icon: <Package className="w-5 h-5" /> },
+    { name: 'Frame Studio', path: '/admin/frames', icon: <FrameIcon className="w-5 h-5" /> },
+    { name: 'Orders', path: '/admin/orders', icon: <ShoppingCart className="w-5 h-5" /> },
+    { name: 'Customers', path: '/admin/customers', icon: <Users className="w-5 h-5" /> },
+    { name: 'Settings', path: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
   ];
 
   return (
@@ -704,7 +632,10 @@ export default function Admin() {
           <Link
             key={link.path}
             to={link.path}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 text-xs font-bold whitespace-nowrap hover:text-gold"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
+              location.pathname === link.path ? "bg-gold text-bg" : "bg-white/5 text-muted hover:text-gold"
+            )}
           >
             {link.icon}
             {link.name}
@@ -721,7 +652,9 @@ export default function Admin() {
               to={link.path}
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium",
-                "hover:bg-white/5 hover:text-gold"
+                location.pathname === link.path 
+                  ? "bg-gold/10 text-gold border border-gold/20" 
+                  : "hover:bg-white/5 hover:text-gold"
               )}
             >
               {link.icon}
