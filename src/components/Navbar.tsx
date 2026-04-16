@@ -38,8 +38,9 @@ export default function Navbar() {
     { name: 'Home', path: '/' },
     { name: 'Products', path: '/products' },
     { name: 'Customize', path: '/customize' },
-    { name: 'Contact', path: '/contact' },
+    { name: 'My Orders', path: '/orders' },
     { name: 'Track Order', path: '/track' },
+    { name: 'Contact', path: '/contact' },
   ];
 
   return (

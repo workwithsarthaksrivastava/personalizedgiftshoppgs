@@ -100,9 +100,9 @@ export default function Orders() {
                       <Package className="w-8 h-8" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">{order.orderId}</h4>
+                      <h4 className="font-bold text-lg mb-1">{order.order_id}</h4>
                       <p className="text-xs text-muted mb-3">
-                        Placed on {new Date(order.createdAt).toLocaleDateString()}
+                        Placed on {new Date(order.created_at).toLocaleDateString()}
                       </p>
                       <div className="flex items-center gap-2">
                         <span className={cn(
@@ -121,7 +121,7 @@ export default function Orders() {
                       <p className="text-xl font-bold text-gold">₹{order.total}</p>
                     </div>
                     <Link 
-                      to={`/track?order=${order.orderId}`}
+                      to={`/track?order=${order.order_id}`}
                       className="flex items-center gap-2 text-sm font-bold text-white hover:text-gold transition-colors"
                     >
                       Track Details <ChevronRight className="w-4 h-4" />

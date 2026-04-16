@@ -13,6 +13,7 @@ export default function Checkout() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
   const navigate = useNavigate();
   const total = getTotal();
 
@@ -63,6 +64,7 @@ export default function Checkout() {
       const { error } = await supabase.from('orders').insert([orderData]);
       if (error) throw error;
       
+      setPlacedOrderId(orderId);
       setStep(3);
       clearCart();
       toast.success('Order placed successfully!');
@@ -200,9 +202,29 @@ export default function Checkout() {
               <CheckCircle2 className="w-16 h-16" />
             </div>
             <h2 className="text-4xl font-display font-bold text-gold mb-4">Order Confirmed!</h2>
-            <p className="text-muted mb-12 max-w-md mx-auto">
+            <p className="text-muted mb-6 max-w-md mx-auto">
               Your order has been placed successfully. We've sent a confirmation email to your inbox.
             </p>
+            
+            {placedOrderId && (
+              <div className="glass p-6 rounded-2xl max-w-sm mx-auto mb-12 border-gold/20">
+                <p className="text-xs text-muted uppercase font-bold mb-2">Your Order ID</p>
+                <div className="flex items-center justify-center gap-3">
+                  <code className="text-xl font-mono font-bold text-white">{placedOrderId}</code>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(placedOrderId);
+                      toast.success('Order ID copied!');
+                    }}
+                    className="p-2 hover:text-gold transition-colors"
+                    title="Copy Order ID"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/track" className="px-8 py-4 gold-gradient text-bg font-bold rounded-full hover:scale-105 transition-transform">
                 Track My Order
