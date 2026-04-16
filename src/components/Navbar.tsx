@@ -88,7 +88,7 @@ export default function Navbar() {
               </span>
             )}
           </Link>
-          <Link to={localStorage.getItem('admin_bypass') === 'true' ? "/admin" : (user ? "/orders" : "/login")} className="p-2 hover:text-gold transition-colors">
+          <Link to={user ? "/orders" : "/login"} className="p-2 hover:text-gold transition-colors">
             <User className="w-6 h-6" />
           </Link>
           <button

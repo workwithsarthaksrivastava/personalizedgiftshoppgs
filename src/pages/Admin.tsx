@@ -598,14 +598,14 @@ export default function Admin() {
           navigate('/');
         }
       } else {
-        navigate('/login');
+        navigate('/admin/login');
       }
     };
 
     checkAdmin();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) navigate('/login');
+      if (!session) navigate('/admin/login');
     });
 
     return () => subscription.unsubscribe();
