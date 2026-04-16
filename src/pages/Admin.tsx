@@ -361,11 +361,49 @@ const FramesManagement = () => {
     }
   };
 
+  const handleCleanupDuplicates = async () => {
+    setLoading(true);
+    try {
+      const { data: allFrames } = await supabase.from('custom_frames').select('id, name');
+      if (!allFrames) return;
+
+      const seen = new Set();
+      const duplicateIds: string[] = [];
+
+      allFrames.forEach(frame => {
+        if (seen.has(frame.name)) {
+          duplicateIds.push(frame.id);
+        } else {
+          seen.add(frame.name);
+        }
+      });
+
+      if (duplicateIds.length > 0) {
+        const { error } = await supabase.from('custom_frames').delete().in('id', duplicateIds);
+        if (error) throw error;
+        toast.success(`Removed ${duplicateIds.length} duplicate frames!`);
+        fetchFrames();
+      } else {
+        toast.info('No duplicate frames found.');
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap justify-between items-center gap-4">
         <h2 className="text-3xl font-bold text-gold">Frame Studio Management</h2>
         <div className="flex gap-4">
+          <button 
+            onClick={handleCleanupDuplicates}
+            className="flex items-center gap-2 px-6 py-3 bg-red-500/10 border border-red-500/20 text-red-500 font-bold rounded-xl hover:bg-red-500/20 transition-all"
+          >
+            <Trash2 className="w-5 h-5" /> Cleanup Duplicates
+          </button>
           <button 
             onClick={() => { setIsAdding(true); setEditingFrame(null); }}
             className="flex items-center gap-2 px-6 py-3 gold-gradient text-bg font-bold rounded-xl hover:scale-105 transition-transform"
@@ -429,14 +467,17 @@ const FramesManagement = () => {
                 </div>
               )}
               
-              <div className="p-4 bg-white/5 rounded-xl border border-border">
+              <div className="p-4 bg-muted/20 rounded-xl border border-border">
                 <p className="text-[10px] text-muted uppercase font-bold mb-4">Final Preview</p>
                 <div className="flex justify-center">
-                  <div className="relative w-24 h-32 bg-white/10 overflow-hidden">
+                  <div className="relative w-24 h-32 bg-white/5 rounded shadow-inner overflow-hidden">
                     {newFrame.image_url ? (
                       <img src={newFrame.image_url} className="absolute inset-0 w-full h-full object-contain z-10" />
                     ) : (
-                      <div className={cn("absolute inset-0", newFrame.class_name)} />
+                      <div 
+                        style={getFrameStyles(newFrame.class_name)}
+                        className={cn("absolute inset-0", newFrame.class_name)} 
+                      />
                     )}
                   </div>
                 </div>
@@ -453,11 +494,14 @@ const FramesManagement = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {frames.map(frame => (
           <div key={frame.id} className="glass p-4 rounded-2xl group relative">
-            <div className="aspect-[3/4] mb-4 flex items-center justify-center overflow-hidden rounded-lg bg-white/5 relative">
+            <div className="aspect-[3/4] mb-4 flex items-center justify-center overflow-hidden rounded-lg bg-bg/50 border border-border/20 relative">
               {frame.image_url ? (
                 <img src={frame.image_url} className="w-full h-full object-contain z-10" />
               ) : (
-                <div className={cn("w-2/3 h-2/3 bg-white/10", frame.class_name)} />
+                <div 
+                  style={getFrameStyles(frame.class_name)}
+                  className={cn("w-2/3 h-2/3 shadow-2xl bg-white/5", frame.class_name)} 
+                />
               )}
             </div>
             <div className="space-y-1">
@@ -510,6 +554,20 @@ const OrdersManagement = () => {
     if ((supabase as any).supabaseUrl.includes('placeholder')) return;
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
     if (data) setOrders(data);
+  };
+
+  const getFrameStyles = (classStr: string): React.CSSProperties => {
+    if (!classStr) return {};
+    const styles: React.CSSProperties = {};
+    const hexMatch = classStr.match(/border-\[(#[a-fA-F0-9]{3,6})\]/);
+    if (hexMatch) styles.borderColor = hexMatch[1];
+    else {
+      const rgbaMatch = classStr.match(/border-\[(rgba?\(.*?\))\]/);
+      if (rgbaMatch) styles.borderColor = rgbaMatch[1];
+    }
+    const widthMatch = classStr.match(/border-\[(\d+px)\]/);
+    if (widthMatch) styles.borderWidth = widthMatch[1];
+    return styles;
   };
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
@@ -578,37 +636,16 @@ export default function Admin() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // Strict Admin Check: Only allow specific email or 'admin' role in DB
-        const isAdminEmail = session.user.email === 'sarthaksrivastava1084@gmail.com';
-        
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-
-        if (isAdminEmail || (profile && profile.role === 'admin')) {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-          toast.error('Access denied. Admins only.');
-          navigate('/');
-        }
-      } else {
-        navigate('/admin/login');
+      // Direct session check based on hardcoded login
+      if (localStorage.getItem('admin_session') === 'true') {
+        setIsAdmin(true);
+        return;
       }
+      
+      navigate('/admin/login');
     };
 
     checkAdmin();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) navigate('/admin/login');
-    });
-
-    return () => subscription.unsubscribe();
   }, [navigate]);
 
   if (isAdmin === null) return <div className="min-h-screen bg-bg" />;
@@ -664,8 +701,8 @@ export default function Admin() {
         <div className="mt-auto">
           <button 
             onClick={async () => {
-              await supabase.auth.signOut();
-              navigate('/login');
+              localStorage.removeItem('admin_session');
+              navigate('/admin/login');
             }}
             className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-400/10 text-red-400 transition-all text-sm font-medium w-full"
           >

@@ -16,33 +16,17 @@ export default function AdminLogin() {
     e.preventDefault();
     setLoading(true);
     
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      if (data.user) {
-        // Double check if the user is actually an admin
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        const isAdminEmail = data.user.email === 'sarthaksrivastava1084@gmail.com';
-
-        if (isAdminEmail || (profile && profile.role === 'admin')) {
-          toast.success('Welcome Admin!');
-          navigate('/admin');
-        } else {
-          await supabase.auth.signOut();
-          toast.error('Access denied. This login is for admins only.');
-        }
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Invalid admin credentials');
-    } finally {
+    // Hardcoded Admin Credentials as requested
+    if (email === 'Rajesh@123' && password === 'Rajesh@suryafilms') {
+      localStorage.setItem('admin_session', 'true');
+      toast.success('Welcome Admin Rajesh!');
+      navigate('/admin');
       setLoading(false);
+      return;
     }
+
+    toast.error('Invalid admin credentials');
+    setLoading(false);
   };
 
   return (

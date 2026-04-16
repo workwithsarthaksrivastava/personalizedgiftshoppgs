@@ -77,6 +77,26 @@ export default function Customize() {
     fetchFrames();
   }, []);
 
+  const getFrameStyles = (classStr: string): React.CSSProperties => {
+    if (!classStr) return {};
+    const styles: React.CSSProperties = {};
+    
+    // Extract color like border-[#d2b48c]
+    const hexMatch = classStr.match(/border-\[(#[a-fA-F0-9]{3,6})\]/);
+    if (hexMatch) styles.borderColor = hexMatch[1];
+    else {
+      // Handle rgb/rgba
+      const rgbaMatch = classStr.match(/border-\[(rgba?\(.*?\))\]/);
+      if (rgbaMatch) styles.borderColor = rgbaMatch[1];
+    }
+    
+    // Extract width like border-[16px]
+    const widthMatch = classStr.match(/border-\[(\d+px)\]/);
+    if (widthMatch) styles.borderWidth = widthMatch[1];
+    
+    return styles;
+  };
+
   const filteredFrames = React.useMemo(() => {
     return activeCategory === 'All' 
       ? frames 
@@ -151,32 +171,38 @@ export default function Customize() {
                     key={selectedFrame.id}
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
+                    style={!selectedFrame.image_url ? getFrameStyles(selectedFrame.class_name) : {}}
                     className={cn(
-                      "relative w-full max-w-md aspect-[3/4] transition-all duration-500 overflow-hidden",
+                      "relative w-full max-w-md aspect-[3/4] transition-all duration-500 overflow-hidden rounded-lg",
                       !selectedFrame.image_url && selectedFrame.class_name
                     )}
                   >
-                    {uploadedImage ? (
-                      <motion.img 
-                        src={uploadedImage} 
-                        style={{ scale: zoom, rotate: `${rotation}deg` }}
-                        className="w-full h-full object-cover cursor-move will-change-transform"
-                        drag
-                        dragMomentum={false}
-                        dragConstraints={{ left: -400, right: 400, top: -400, bottom: 400 }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-muted/30 gap-4 bg-white/5">
-                        <FrameIcon className="w-20 h-20 opacity-20" />
-                        <p className="font-bold text-center px-8">Upload a photo to see the magic</p>
-                      </div>
-                    )}
+                    <div className={cn(
+                      "absolute inset-0 overflow-hidden",
+                      selectedFrame.image_url ? "p-[12%]" : "p-0"
+                    )}>
+                      {uploadedImage ? (
+                        <motion.img 
+                          src={uploadedImage} 
+                          style={{ scale: zoom, rotate: `${rotation}deg` }}
+                          className="w-full h-full object-cover cursor-move will-change-transform"
+                          drag
+                          dragMomentum={false}
+                          dragConstraints={{ left: -400, right: 400, top: -400, bottom: 400 }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-muted/30 gap-4 bg-white/5">
+                          <FrameIcon className="w-20 h-20 opacity-20" />
+                          <p className="font-bold text-center px-8">Upload a photo to see the magic</p>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Graphic Frame Overlay */}
                     {selectedFrame.image_url && (
                       <img 
                         src={selectedFrame.image_url} 
-                        className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10" 
+                        className="absolute inset-0 w-full h-full object-fill pointer-events-none z-10" 
                       />
                     )}
                   </motion.div>
@@ -235,26 +261,31 @@ export default function Customize() {
               </div>
 
               {/* Frames Grid */}
-              <div className="grid grid-cols-3 gap-4 h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-3 gap-4 h-[500px] overflow-y-auto pr-2 custom-scrollbar content-start">
                 {filteredFrames.map(frame => (
                   <button
                     key={frame.id}
                     onClick={() => setSelectedFrame(frame)}
                     className={cn(
-                      "group relative aspect-[3/4] rounded-xl transition-all overflow-hidden border-2",
+                      "group relative aspect-[3/4] w-full rounded-xl transition-all overflow-hidden border-2 flex items-center justify-center bg-white/5",
                       selectedFrame?.id === frame.id ? "border-gold scale-95" : "border-transparent hover:border-white/20"
                     )}
                   >
-                    {frame.image_url ? (
-                      <img src={frame.image_url} className="absolute inset-0 w-full h-full object-contain p-2" />
-                    ) : (
-                      <div className={cn("absolute inset-2", frame.class_name)} />
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <p className="text-[10px] font-bold text-white text-center px-1">{frame.name}</p>
+                    <div className="absolute inset-0 p-3 flex items-center justify-center">
+                      {frame.image_url ? (
+                        <img src={frame.image_url} className="w-full h-full object-contain" />
+                      ) : (
+                        <div 
+                          style={getFrameStyles(frame.class_name)}
+                          className={cn("w-full h-full shadow-sm", frame.class_name)} 
+                        />
+                      )}
+                    </div>
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
+                      <p className="text-[10px] font-bold text-white text-center px-1 leading-tight">{frame.name}</p>
                     </div>
                     {selectedFrame?.id === frame.id && (
-                      <div className="absolute top-1 right-1 bg-gold rounded-full p-0.5">
+                      <div className="absolute top-1 right-1 bg-gold rounded-full p-0.5 z-30">
                         <Sparkles className="w-3 h-3 text-bg" />
                       </div>
                     )}
