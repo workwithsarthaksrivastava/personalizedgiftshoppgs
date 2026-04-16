@@ -556,20 +556,6 @@ const OrdersManagement = () => {
     if (data) setOrders(data);
   };
 
-  const getFrameStyles = (classStr: string): React.CSSProperties => {
-    if (!classStr) return {};
-    const styles: React.CSSProperties = {};
-    const hexMatch = classStr.match(/border-\[(#[a-fA-F0-9]{3,6})\]/);
-    if (hexMatch) styles.borderColor = hexMatch[1];
-    else {
-      const rgbaMatch = classStr.match(/border-\[(rgba?\(.*?\))\]/);
-      if (rgbaMatch) styles.borderColor = rgbaMatch[1];
-    }
-    const widthMatch = classStr.match(/border-\[(\d+px)\]/);
-    if (widthMatch) styles.borderWidth = widthMatch[1];
-    return styles;
-  };
-
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id);
     if (error) toast.error(error.message);
@@ -626,6 +612,21 @@ const OrdersManagement = () => {
       </div>
     </div>
   );
+};
+
+// --- Utility Functions ---
+const getFrameStyles = (classStr: string): React.CSSProperties => {
+  if (!classStr) return {};
+  const styles: React.CSSProperties = {};
+  const hexMatch = classStr.match(/border-\[(#[a-fA-F0-9]{3,6})\]/);
+  if (hexMatch) styles.borderColor = hexMatch[1];
+  else {
+    const rgbaMatch = classStr.match(/border-\[(rgba?\(.*?\))\]/);
+    if (rgbaMatch) styles.borderColor = rgbaMatch[1];
+  }
+  const widthMatch = classStr.match(/border-\[(\d+px)\]/);
+  if (widthMatch) styles.borderWidth = widthMatch[1];
+  return styles;
 };
 
 // --- Main Admin Layout ---
