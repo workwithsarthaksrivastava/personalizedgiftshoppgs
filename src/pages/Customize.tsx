@@ -41,9 +41,20 @@ export default function Customize() {
 
   useEffect(() => {
     const fetchFrames = async () => {
-      setLoading(true);
+      const timeout = setTimeout(() => {
+        if (loading) {
+          setLoading(false);
+          toast.error('Loading is taking longer than expected. Please refresh.');
+        }
+      }, 10000); // 10 second timeout
+
       try {
-        const { data, error } = await supabase.from('custom_frames').select('*');
+        // Only select necessary fields to speed up the query
+        const { data, error } = await supabase
+          .from('custom_frames')
+          .select('id, name, category, class_name, price, image_url')
+          .order('created_at', { ascending: false });
+
         if (error) throw error;
         if (data && data.length > 0) {
           setFrames(data);
@@ -53,6 +64,7 @@ export default function Customize() {
         console.error('Error fetching frames:', error);
         toast.error('Failed to load frame styles');
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
       }
     };
