@@ -17,14 +17,6 @@ export default function Login() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Hardcoded Admin Bypass
-    if (isLogin && email === 'Rajesh@123' && password === 'Rajesh@suryafilms') {
-      localStorage.setItem('admin_bypass', 'true');
-      toast.success('Welcome Admin Rajesh!');
-      navigate('/admin');
-      return;
-    }
-
     setLoading(true);
     try {
       if (isLogin) {

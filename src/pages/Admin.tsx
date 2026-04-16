@@ -578,21 +578,19 @@ export default function Admin() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      if (localStorage.getItem('admin_bypass') === 'true') {
-        setIsAdmin(true);
-        return;
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
+        // Strict Admin Check: Only allow specific email or 'admin' role in DB
+        const isAdminEmail = session.user.email === 'sarthaksrivastava1084@gmail.com';
+        
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', session.user.id)
           .single();
 
-        if (profile && profile.role === 'admin') {
+        if (isAdminEmail || (profile && profile.role === 'admin')) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
@@ -607,7 +605,7 @@ export default function Admin() {
     checkAdmin();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && localStorage.getItem('admin_bypass') !== 'true') navigate('/login');
+      if (!session) navigate('/login');
     });
 
     return () => subscription.unsubscribe();
@@ -666,11 +664,6 @@ export default function Admin() {
         <div className="mt-auto">
           <button 
             onClick={async () => {
-              if (localStorage.getItem('admin_bypass') === 'true') {
-                localStorage.removeItem('admin_bypass');
-                navigate('/login');
-                return;
-              }
               await supabase.auth.signOut();
               navigate('/login');
             }}
