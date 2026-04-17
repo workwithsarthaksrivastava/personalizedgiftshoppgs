@@ -25,6 +25,10 @@ interface FrameStyle {
   class_name: string;
   price: number;
   image_url?: string;
+  orientation?: 'portrait' | 'landscape';
+  thickness?: string;
+  size_options?: string;
+  in_stock?: boolean;
 }
 
 const CATEGORIES = ['All', 'Wood', 'Metal', 'Ornate', 'Modern', 'Colorful', 'Graphic'];
@@ -37,7 +41,18 @@ export default function Customize() {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [selectedSize, setSelectedSize] = useState('');
   const addItem = useCartStore((state) => state.addItem);
+
+  // Update selected size when frame changes
+  useEffect(() => {
+    if (selectedFrame?.size_options) {
+      const sizes = selectedFrame.size_options.split(',').map(s => s.trim());
+      setSelectedSize(sizes[0] || '');
+    } else {
+      setSelectedSize('');
+    }
+  }, [selectedFrame]);
 
   // Cleanup object URL to prevent memory leaks
   useEffect(() => {
@@ -59,13 +74,14 @@ export default function Customize() {
       try {
         const { data, error } = await supabase
           .from('custom_frames')
-          .select('id, name, category, class_name, price, image_url')
+          .select('id, name, category, class_name, price, image_url, orientation, thickness, size_options, in_stock')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
         if (data && data.length > 0) {
-          setFrames(data);
-          setSelectedFrame(data[0]);
+          const availableFrames = data.filter(f => f.in_stock !== false);
+          setFrames(availableFrames);
+          setSelectedFrame(availableFrames[0] || data[0]);
         }
       } catch (error) {
         console.error('Error fetching frames:', error);
@@ -120,6 +136,10 @@ export default function Customize() {
       toast.error('Please upload a photo first');
       return;
     }
+    if (selectedFrame?.size_options && !selectedSize) {
+      toast.error('Please select a frame size');
+      return;
+    }
     addItem({
       productId: `custom-${selectedFrame?.id}`,
       productName: `Custom Frame: ${selectedFrame?.name}`,
@@ -130,7 +150,10 @@ export default function Customize() {
         frameId: selectedFrame?.id,
         frameName: selectedFrame?.name,
         zoom,
-        rotation
+        rotation,
+        size: selectedSize,
+        thickness: selectedFrame?.thickness,
+        orientation: selectedFrame?.orientation
       }
     });
     toast.success('Custom frame added to cart!');
@@ -173,7 +196,8 @@ export default function Customize() {
                     animate={{ opacity: 1, scale: 1 }}
                     style={!selectedFrame.image_url ? getFrameStyles(selectedFrame.class_name) : {}}
                     className={cn(
-                      "relative w-full max-w-md aspect-[3/4] transition-all duration-500 overflow-hidden rounded-lg",
+                      "relative w-full max-w-md transition-all duration-500 overflow-hidden rounded-lg",
+                      selectedFrame.orientation === 'landscape' ? "aspect-[4/3]" : "aspect-[3/4]",
                       !selectedFrame.image_url && selectedFrame.class_name
                     )}
                   >
@@ -293,14 +317,49 @@ export default function Customize() {
                 ))}
               </div>
 
-              <div className="mt-8 pt-8 border-t border-border">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-muted text-sm">Selected Style</span>
-                  <span className="text-gold font-bold">{selectedFrame?.name || 'None'}</span>
+              <div className="mt-8 pt-8 border-t border-border space-y-4">
+                {selectedFrame?.size_options && (
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-muted uppercase tracking-widest">Select Size</label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedFrame.size_options.split(',').map(size => (
+                        <button
+                          key={size}
+                          onClick={() => setSelectedSize(size.trim())}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-all",
+                            selectedSize === size.trim()
+                              ? "bg-gold text-bg border-gold"
+                              : "bg-white/5 border-border text-muted hover:border-gold/50"
+                          )}
+                        >
+                          {size.trim()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-muted text-[10px] uppercase font-bold block mb-1">Thickness</span>
+                    <span className="text-white font-bold text-sm tracking-wide">{selectedFrame?.thickness || 'Standard'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted text-[10px] uppercase font-bold block mb-1">Orientation</span>
+                    <span className="text-white font-bold text-sm tracking-wide capitalize">{selectedFrame?.orientation || 'Portrait'}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted text-sm">Frame Price</span>
-                  <span className="text-2xl font-bold">₹{selectedFrame?.price || 0}</span>
+
+                <div className="pt-4 border-t border-border/50">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-muted text-sm">Selected Style</span>
+                    <span className="text-gold font-bold">{selectedFrame?.name || 'None'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted text-sm">Frame Price</span>
+                    <span className="text-2xl font-bold">₹{selectedFrame?.price || 0}</span>
+                  </div>
                 </div>
               </div>
             </div>

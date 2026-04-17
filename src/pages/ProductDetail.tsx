@@ -125,27 +125,51 @@ export default function ProductDetail() {
     }
   };
 
+  const [selectedParams, setSelectedParams] = useState<Record<string, string>>({});
+
   const handleAddToCart = () => {
     if (!product) return;
+    
+    // Check if all custom params are selected
+    if (customizationArea.custom_params?.length > 0) {
+      const allSelected = customizationArea.custom_params.every((p: any) => selectedParams[p.label]);
+      if (!allSelected) {
+        toast.error('Please select all options before adding to cart');
+        return;
+      }
+    }
+
     addItem({
       productId: product.id,
       productName: product.name,
       price: product.price,
       quantity: 1,
       image: uploadedImage || mainImage,
-      config: uploadedImage ? {
-        originalProductImage: mainImage,
-        customImage: uploadedImage,
-        zoom,
-        rotation,
-        position
-      } : undefined
+      config: {
+        ...(uploadedImage ? {
+          originalProductImage: mainImage,
+          customImage: uploadedImage,
+          zoom,
+          rotation,
+          position
+        } : {}),
+        selectedParams
+      }
     });
     toast.success('Added to cart');
   };
 
   const handleBuyNow = () => {
     if (!product) return;
+
+    if (customizationArea.custom_params?.length > 0) {
+      const allSelected = customizationArea.custom_params.every((p: any) => selectedParams[p.label]);
+      if (!allSelected) {
+        toast.error('Please select all options');
+        return;
+      }
+    }
+
     clearCart();
     addItem({
       productId: product.id,
@@ -153,13 +177,16 @@ export default function ProductDetail() {
       price: product.price,
       quantity: 1,
       image: uploadedImage || mainImage,
-      config: uploadedImage ? {
-        originalProductImage: mainImage,
-        customImage: uploadedImage,
-        zoom,
-        rotation,
-        position
-      } : undefined
+      config: {
+        ...(uploadedImage ? {
+          originalProductImage: mainImage,
+          customImage: uploadedImage,
+          zoom,
+          rotation,
+          position
+        } : {}),
+        selectedParams
+      }
     });
     navigate('/checkout');
   };
@@ -479,25 +506,59 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            <div className="prose prose-invert mb-10">
+            <div className="prose prose-invert mb-8">
               <p className="text-muted leading-relaxed whitespace-pre-wrap">
                 {descText || "A beautiful personalized gift to capture your best memories."}
               </p>
             </div>
 
+            {customizationArea.custom_params?.length > 0 && (
+              <div className="space-y-6 mb-10">
+                {customizationArea.custom_params.map((param: any, idx: number) => (
+                  <div key={idx} className="space-y-3">
+                    <label className="text-xs font-bold text-muted uppercase tracking-widest">{param.label}</label>
+                    <div className="flex flex-wrap gap-2">
+                      {param.options.map((option: string) => (
+                        <button
+                          key={option}
+                          onClick={() => setSelectedParams(prev => ({ ...prev, [param.label]: option }))}
+                          className={cn(
+                            "px-4 py-2 rounded-xl border text-sm font-bold transition-all",
+                            selectedParams[param.label] === option
+                              ? "bg-gold text-bg border-gold"
+                              : "border-white/10 text-white hover:border-gold/50"
+                          )}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-4 mt-auto">
-              <button 
-                onClick={handleAddToCart}
-                className="flex-1 py-4 border border-gold text-gold font-bold rounded-xl hover:bg-gold/10 transition-colors flex items-center justify-center gap-2"
-              >
-                <ShoppingCart className="w-5 h-5" /> Add to Cart
-              </button>
-              <button 
-                onClick={handleBuyNow}
-                className="flex-1 py-4 gold-gradient text-bg font-bold rounded-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
-              >
-                <Zap className="w-5 h-5" /> Buy Now
-              </button>
+              {customizationArea.in_stock === false ? (
+                <div className="w-full py-4 bg-red-500/10 border border-red-500/20 text-red-400 font-bold rounded-xl text-center">
+                  Currently Out of Stock
+                </div>
+              ) : (
+                <>
+                  <button 
+                    onClick={handleAddToCart}
+                    className="flex-1 py-4 border border-gold text-gold font-bold rounded-xl hover:bg-gold/10 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="w-5 h-5" /> Add to Cart
+                  </button>
+                  <button 
+                    onClick={handleBuyNow}
+                    className="flex-1 py-4 gold-gradient text-bg font-bold rounded-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                  >
+                    <Zap className="w-5 h-5" /> Buy Now
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

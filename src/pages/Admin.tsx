@@ -277,7 +277,9 @@ const ProductsManagement = () => {
     image: '',
     images: [] as string[],
     areaType: 'full',
-    customArea: { type: 'rect', x: 0, y: 0, w: 100, h: 100 }
+    customArea: { type: 'rect', x: 0, y: 0, w: 100, h: 100 },
+    in_stock: true,
+    custom_params: [] as { label: string, options: string[], optionsText?: string }[]
   });
 
   const handleAreaTypeChange = (type: string) => {
@@ -287,6 +289,48 @@ const ProductsManagement = () => {
     else if (type === 'top_half') area = { type: 'rect', x: 0, y: 0, w: 100, h: 50 };
     
     setNewProduct(prev => ({...prev, areaType: type, customArea: area}));
+  };
+
+  const handleAddParam = () => {
+    setNewProduct(prev => ({
+      ...prev,
+      custom_params: [...prev.custom_params, { label: '', options: [], optionsText: '' }]
+    }));
+  };
+
+  const handleUpdateParam = (index: number, label: string, optionsText: string) => {
+    const updated = [...newProduct.custom_params];
+    updated[index] = {
+      label,
+      // Split by comma, space, or newline
+      options: optionsText.split(/[,\s\n]+/).map(o => o.trim()).filter(Boolean)
+    };
+    setNewProduct(prev => ({ ...prev, custom_params: updated }));
+  };
+
+  const handleRemoveParam = (index: number) => {
+    setNewProduct(prev => ({
+      ...prev,
+      custom_params: prev.custom_params.filter((_, i) => i !== index)
+    }));
+  };
+
+  const toggleProductStock = async (product: any) => {
+    const [desc, configStr] = (product.description || '').split('___CONFIG___');
+    let config = { in_stock: true };
+    try {
+      if (configStr) config = JSON.parse(configStr);
+    } catch (e) {}
+    
+    config.in_stock = !config.in_stock;
+    const newDesc = `${desc}___CONFIG___${JSON.stringify(config)}`;
+    
+    const { error } = await supabase.from('products').update({ description: newDesc }).eq('id', product.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('Stock status updated');
+      fetchProducts();
+    }
   };
 
   const categories = ['Album Printing', 'Photo Frames', 'UV Printing', 'Sublimation Gifts'];
@@ -308,10 +352,14 @@ const ProductsManagement = () => {
       return;
     }
     
-    let finalDesc = newProduct.description;
-    if (newProduct.customArea) {
-      finalDesc += `___CONFIG___${JSON.stringify(newProduct.customArea)}`;
-    }
+    const config = {
+      ...newProduct.customArea,
+      areaType: newProduct.areaType,
+      in_stock: newProduct.in_stock,
+      custom_params: newProduct.custom_params
+    };
+    
+    let finalDesc = `${newProduct.description}___CONFIG___${JSON.stringify(config)}`;
 
     const { error } = await supabase.from('products').insert([{
       name: newProduct.name,
@@ -328,7 +376,19 @@ const ProductsManagement = () => {
     } else {
       toast.success('Product added successfully');
       setIsAdding(false);
-      setNewProduct({ name: '', category: 'Photo Frames', price: '', original_price: '', description: '', image: '', images: [], areaType: 'full', customArea: { type: 'rect', x: 0, y: 0, w: 100, h: 100 } });
+      setNewProduct({ 
+        name: '', 
+        category: 'Photo Frames', 
+        price: '', 
+        original_price: '', 
+        description: '', 
+        image: '', 
+        images: [], 
+        areaType: 'full', 
+        customArea: { type: 'rect', x: 0, y: 0, w: 100, h: 100 },
+        in_stock: true,
+        custom_params: []
+      });
       fetchProducts();
     }
   };
@@ -400,6 +460,48 @@ const ProductsManagement = () => {
               <div>
                 <label className="block text-xs font-bold text-muted uppercase mb-2">Description</label>
                 <textarea rows={4} value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-bg border border-border rounded-xl px-4 py-3 outline-none focus:border-gold resize-none" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="in_stock" 
+                  checked={newProduct.in_stock} 
+                  onChange={e => setNewProduct({...newProduct, in_stock: e.target.checked})} 
+                  className="w-4 h-4 rounded border-border text-gold bg-bg accent-gold"
+                />
+                <label htmlFor="in_stock" className="text-xs font-bold text-muted uppercase cursor-pointer">In Stock</label>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-muted uppercase">Custom Parameters (e.g. Size, Color)</label>
+                  <button type="button" onClick={handleAddParam} className="text-[10px] font-bold text-gold hover:underline">
+                    + Add Parameter
+                  </button>
+                </div>
+                {newProduct.custom_params.map((param, idx) => (
+                  <div key={idx} className="p-4 bg-white/5 rounded-xl border border-border space-y-3">
+                    <div className="flex justify-between gap-2">
+                      <input 
+                        placeholder="Label (e.g. Size)" 
+                        value={param.label} 
+                        onChange={e => handleUpdateParam(idx, e.target.value, param.options.join(', '))}
+                        className="flex-grow bg-bg border border-border rounded-lg px-3 py-2 text-xs outline-none focus:border-gold"
+                      />
+                      <button type="button" onClick={() => handleRemoveParam(idx)} className="text-red-400 hover:text-red-300">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <input 
+                      type="text"
+                      placeholder="Options (e.g. S M L)" 
+                      defaultValue={param.optionsText || param.options.join(' ')} 
+                      onBlur={e => handleUpdateParam(idx, param.label, e.target.value)}
+                      className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-xs outline-none focus:border-gold"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -490,7 +592,18 @@ const ProductsManagement = () => {
               </button>
             </div>
             <div className="p-6">
-              <p className="text-[10px] font-bold text-gold uppercase tracking-widest mb-1">{product.category}</p>
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-[10px] font-bold text-gold uppercase tracking-widest">{product.category}</p>
+                <button 
+                  onClick={() => toggleProductStock(product)}
+                  className={cn(
+                    "px-2 py-0.5 text-[8px] font-bold rounded-full uppercase transition-all hover:scale-105",
+                    (!product.description?.includes('in_stock":false')) ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"
+                  )}
+                >
+                  {(!product.description?.includes('in_stock":false')) ? 'In Stock' : 'Out of Stock'}
+                </button>
+              </div>
               <h4 className="font-bold mb-2">{product.name}</h4>
               <p className="text-xl font-bold">₹{product.price}</p>
             </div>
@@ -512,10 +625,23 @@ const FramesManagement = () => {
     category: 'Wood',
     price: '',
     class_name: '',
-    image_url: ''
+    image_url: '',
+    orientation: 'portrait' as 'portrait' | 'landscape',
+    thickness: '15mm',
+    size_options: '8x10, 11x14, 16x20',
+    in_stock: true
   });
 
   const categories = ['Wood', 'Metal', 'Ornate', 'Modern', 'Colorful', 'Graphic'];
+
+  const toggleFrameStock = async (frame: any) => {
+    const { error } = await supabase.from('custom_frames').update({ in_stock: !frame.in_stock }).eq('id', frame.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('Frame stock status updated');
+      fetchFrames();
+    }
+  };
 
   useEffect(() => {
     fetchFrames();
@@ -530,9 +656,13 @@ const FramesManagement = () => {
     e.preventDefault();
     const frameData = {
       ...newFrame,
-      price: parseFloat(newFrame.price)
+      price: parseFloat(newFrame.price),
+      thickness: newFrame.thickness,
+      orientation: newFrame.orientation,
+      size_options: newFrame.size_options,
+      in_stock: newFrame.in_stock
     };
-
+    
     let error;
     if (editingFrame) {
       const { error: err } = await supabase.from('custom_frames').update(frameData).eq('id', editingFrame.id);
@@ -548,7 +678,17 @@ const FramesManagement = () => {
       toast.success(editingFrame ? 'Frame updated' : 'Frame added');
       setIsAdding(false);
       setEditingFrame(null);
-      setNewFrame({ name: '', category: 'Wood', price: '', class_name: '', image_url: '' });
+      setNewFrame({ 
+        name: '', 
+        category: 'Wood', 
+        price: '', 
+        class_name: '', 
+        image_url: '',
+        orientation: 'portrait',
+        thickness: '15mm',
+        size_options: '8x10, 11x14, 16x20',
+        in_stock: true
+      });
       fetchFrames();
     }
   };
@@ -647,6 +787,33 @@ const FramesManagement = () => {
                 <label className="block text-xs font-bold text-muted uppercase mb-2">Price (₹)</label>
                 <input required type="number" value={newFrame.price} onChange={e => setNewFrame({...newFrame, price: e.target.value})} className="w-full bg-bg border border-border rounded-xl px-4 py-3 outline-none focus:border-gold" />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-muted uppercase mb-2">Orientation</label>
+                  <select value={newFrame.orientation} onChange={e => setNewFrame({...newFrame, orientation: e.target.value as any})} className="w-full bg-bg border border-border rounded-xl px-4 py-3 outline-none focus:border-gold">
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted uppercase mb-2">Thickness</label>
+                  <input placeholder="e.g. 15mm" value={newFrame.thickness} onChange={e => setNewFrame({...newFrame, thickness: e.target.value})} className="w-full bg-bg border border-border rounded-xl px-4 py-3 outline-none focus:border-gold" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-muted uppercase mb-2">Size Options (CSV)</label>
+                <input placeholder="e.g. 8x10, 11x14" value={newFrame.size_options} onChange={e => setNewFrame({...newFrame, size_options: e.target.value})} className="w-full bg-bg border border-border rounded-xl px-4 py-3 outline-none focus:border-gold" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="frame_in_stock" 
+                  checked={newFrame.in_stock} 
+                  onChange={e => setNewFrame({...newFrame, in_stock: e.target.checked})} 
+                  className="w-4 h-4 rounded border-border text-gold bg-bg accent-gold"
+                />
+                <label htmlFor="frame_in_stock" className="text-xs font-bold text-muted uppercase cursor-pointer">In Stock</label>
+              </div>
             </div>
 
             <div className="space-y-6">
@@ -717,9 +884,21 @@ const FramesManagement = () => {
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gold uppercase">{frame.category}</p>
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] font-bold text-gold uppercase">{frame.category}</p>
+                <button 
+                  onClick={() => toggleFrameStock(frame)}
+                  className={cn(
+                    "px-2 py-0.5 text-[8px] font-bold rounded-full uppercase transition-all hover:scale-105",
+                    frame.in_stock !== false ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"
+                  )}
+                >
+                  {frame.in_stock !== false ? 'In Stock' : 'Out of Stock'}
+                </button>
+              </div>
               <h4 className="font-bold text-sm truncate">{frame.name}</h4>
               <p className="text-sm">₹{frame.price}</p>
+              <p className="text-[10px] text-muted">{frame.orientation} • {frame.thickness}</p>
             </div>
             
             <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
@@ -731,7 +910,11 @@ const FramesManagement = () => {
                     category: frame.category,
                     price: frame.price.toString(),
                     class_name: frame.class_name || '',
-                    image_url: frame.image_url || ''
+                    image_url: frame.image_url || '',
+                    orientation: frame.orientation || 'portrait',
+                    thickness: frame.thickness || '15mm',
+                    size_options: frame.size_options || '8x10, 11x14, 16x20',
+                    in_stock: frame.in_stock !== false
                   });
                   setIsAdding(false);
                 }}

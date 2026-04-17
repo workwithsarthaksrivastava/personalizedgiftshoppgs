@@ -59,6 +59,12 @@ export default function Products() {
   const filteredProducts = products.filter(p => p.category === activeCategory);
 
   const handleAddToCart = (product: any) => {
+    const isOutOfStock = product.description?.includes('in_stock":false');
+    if (isOutOfStock) {
+      toast.error('This product is currently out of stock');
+      return;
+    }
+
     addItem({
       productId: product.id,
       productName: product.name,
@@ -102,46 +108,62 @@ export default function Products() {
 
         {/* Product Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {filteredProducts.map((product) => (
-            <motion.div
-              key={product.id}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="glass rounded-2xl overflow-hidden group"
-            >
-              <div className="relative aspect-square overflow-hidden">
-                <img 
-                  src={product.image} 
-                  alt={product.name} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-bg/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                  <Link 
-                    to={`/product/${product.id}`}
-                    className="w-12 h-12 bg-white text-bg rounded-full flex items-center justify-center hover:bg-gold transition-colors"
-                  >
-                    <Eye className="w-6 h-6" />
+          {filteredProducts.map((product) => {
+            const isOutOfStock = product.description?.includes('in_stock":false');
+            
+            return (
+              <motion.div
+                key={product.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={cn(
+                  "glass rounded-2xl overflow-hidden group border transition-all",
+                  isOutOfStock ? "opacity-75 grayscale-[0.5] border-white/5" : "border-white/10 hover:border-gold/30"
+                )}
+              >
+                <div className="relative aspect-square overflow-hidden">
+                  <img 
+                    src={product.image} 
+                    alt={product.name} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    referrerPolicy="no-referrer"
+                  />
+                  {isOutOfStock && (
+                    <div className="absolute top-4 left-4 z-10">
+                      <span className="px-3 py-1 bg-red-500 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-lg">
+                        Out of Stock
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-bg/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                    <Link 
+                      to={`/product/${product.id}`}
+                      className="w-12 h-12 bg-white text-bg rounded-full flex items-center justify-center hover:bg-gold transition-colors shadow-xl"
+                    >
+                      <Eye className="w-6 h-6" />
+                    </Link>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <Link to={`/product/${product.id}`}>
+                    <h3 className="text-lg font-bold mb-2 hover:text-gold transition-colors line-clamp-1">{product.name}</h3>
                   </Link>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gold font-bold text-xl">₹{product.price}</span>
+                    {!isOutOfStock && (
+                      <button 
+                        onClick={() => handleAddToCart(product)}
+                        className="p-2 bg-gold/10 text-gold rounded-lg hover:bg-gold hover:text-bg transition-all"
+                      >
+                        <ShoppingCart className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="p-6">
-                <Link to={`/product/${product.id}`}>
-                  <h3 className="text-lg font-bold mb-2 hover:text-gold transition-colors">{product.name}</h3>
-                </Link>
-                <div className="flex items-center justify-between">
-                  <span className="text-gold font-bold text-xl">₹{product.price}</span>
-                  <button 
-                    onClick={() => handleAddToCart(product)}
-                    className="p-2 bg-gold/10 text-gold rounded-lg hover:bg-gold hover:text-bg transition-all"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
 
