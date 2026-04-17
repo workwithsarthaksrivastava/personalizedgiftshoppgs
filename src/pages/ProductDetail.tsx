@@ -169,6 +169,54 @@ export default function ProductDetail() {
 
   const images = product.images || [product.image];
 
+  const [descText, configString] = (product.description || '').split('___CONFIG___');
+  let customizationArea = { type: 'rect', x: 0, y: 0, w: 100, h: 100 } as any;
+  if (configString) {
+    try {
+      customizationArea = JSON.parse(configString);
+      // Compatibility for old rect formats
+      if (!customizationArea.type) {
+        customizationArea.type = 'rect';
+      }
+    } catch(e) {}
+  }
+
+  // Calculate coordinates and styles based on type
+  let containerStyle: React.CSSProperties = {};
+  let clipPath: string | undefined = undefined;
+
+  if (customizationArea.type === 'rect') {
+    containerStyle = {
+      left: `${customizationArea.x}%`,
+      top: `${customizationArea.y}%`,
+      width: `${customizationArea.w}%`,
+      height: `${customizationArea.h}%`,
+    };
+  } else if (customizationArea.type === 'polygon' && customizationArea.points?.length > 0) {
+    const xs = customizationArea.points.map((p: any) => p.x);
+    const ys = customizationArea.points.map((p: any) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const w = maxX - minX;
+    const h = maxY - minY;
+
+    containerStyle = {
+      left: `${minX}%`,
+      top: `${minY}%`,
+      width: `${w}%`,
+      height: `${h}%`,
+    };
+
+    if (w > 0 && h > 0) {
+      const polygonPoints = customizationArea.points
+        .map((p: any) => `${((p.x - minX) / w) * 100}% ${((p.y - minY) / h) * 100}%`)
+        .join(', ');
+      clipPath = `polygon(${polygonPoints})`;
+    }
+  }
+
   return (
     <div className="pt-32 pb-20 px-6 min-h-screen">
       <div className="max-w-6xl mx-auto">
@@ -189,31 +237,46 @@ export default function ProductDetail() {
                   className="w-full h-full relative"
                 >
                   {isCustomizing && uploadedImage ? (
-                    <div className="w-full h-full relative bg-white/5 rounded-3xl overflow-hidden flex items-center justify-center">
-                      {/* Undelaying Product Image as Background (Low Opacity) */}
-                      <img 
-                        src={mainImage} 
-                        className="absolute inset-0 w-full h-full object-contain opacity-30 select-none pointer-events-none" 
-                        alt=""
-                      />
+                    <div className="w-full h-full relative bg-white/5 rounded-3xl overflow-hidden flex items-center justify-center p-4">
                       
-                      {/* User's Uploaded Image with Controls */}
-                      <motion.div
-                        drag
-                        dragMomentum={false}
-                        onDragEnd={(_, info) => setPosition({ x: info.offset.x, y: info.offset.y })}
-                        style={{ x: position.x, y: position.y, scale: zoom, rotate: rotation }}
-                        className="w-48 h-48 cursor-move relative z-10"
-                      >
+                      <div className="relative inline-flex max-w-full max-h-full items-center justify-center">
+                        {/* Undelaying Product Image as Background (Low Opacity) */}
                         <img 
-                          src={uploadedImage} 
-                          className="w-full h-full object-cover rounded-lg shadow-2xl border-2 border-gold/50" 
-                          alt="Custom preview"
+                          src={mainImage} 
+                          className="max-w-full max-h-full object-contain opacity-30 select-none pointer-events-none rounded-2xl" 
+                          alt=""
                         />
-                        <div className="absolute -top-3 -right-3 bg-gold p-1 rounded-full shadow-lg">
-                          <Move className="w-4 h-4 text-bg" />
+                        
+                        {/* Customization Constraints Area */}
+                        <div 
+                          className={cn(
+                            "absolute flex items-center justify-center bg-black/20 overflow-hidden",
+                            customizationArea.type === 'rect' ? "border-2 border-gold/40 border-dashed" : "border border-gold/20"
+                          )}
+                          style={{
+                            ...containerStyle,
+                            clipPath
+                          }}
+                        >
+                          {/* User's Uploaded Image with Controls */}
+                          <motion.div
+                            drag
+                            dragMomentum={false}
+                            onDragEnd={(_, info) => setPosition({ x: info.offset.x, y: info.offset.y })}
+                            style={{ x: position.x, y: position.y, scale: zoom, rotate: rotation }}
+                            className="w-full h-full cursor-move relative z-10"
+                          >
+                            <img 
+                              src={uploadedImage} 
+                              className="w-full h-full object-cover shadow-2xl" 
+                              alt="Custom preview"
+                            />
+                            <div className="absolute top-2 right-2 bg-gold p-1 rounded-full shadow-lg opacity-50 hover:opacity-100 transition-opacity">
+                              <Move className="w-4 h-4 text-bg" />
+                            </div>
+                          </motion.div>
                         </div>
-                      </motion.div>
+                      </div>
 
                       {/* Floating Controls for Customization */}
                       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 glass px-4 py-2 rounded-2xl border-white/10 shadow-2xl">
@@ -418,7 +481,7 @@ export default function ProductDetail() {
 
             <div className="prose prose-invert mb-10">
               <p className="text-muted leading-relaxed whitespace-pre-wrap">
-                {product.description || "A beautiful personalized gift to capture your best memories."}
+                {descText || "A beautiful personalized gift to capture your best memories."}
               </p>
             </div>
 

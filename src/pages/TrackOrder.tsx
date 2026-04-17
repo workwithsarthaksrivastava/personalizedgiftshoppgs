@@ -130,9 +130,23 @@ export default function TrackOrder() {
               <h4 className="font-bold mb-4">Order Items</h4>
               <div className="space-y-4">
                 {order.items.map((item: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-muted">{item.productName} x {item.quantity}</span>
-                    <span className="font-bold">₹{item.price * item.quantity}</span>
+                  <div key={i} className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden border border-border/50">
+                        {item.image ? (
+                          <img src={item.image} className="w-full h-full object-cover" alt={item.productName} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="w-4 h-4 text-muted" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{item.productName}</p>
+                        <p className="text-xs text-muted">Quantity: {item.quantity}</p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-sm">₹{item.price * item.quantity}</span>
                   </div>
                 ))}
                 <div className="pt-4 border-t border-border flex justify-between font-bold text-gold">

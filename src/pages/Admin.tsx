@@ -18,11 +18,171 @@ import {
   ChevronRight,
   Frame as FrameIcon,
   Edit2,
-  RotateCcw
+  RotateCcw,
+  Scissors,
+  Square,
+  Undo2,
+  Check
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
+
+const ImageAreaSelector = ({ image, area, onChange }: any) => {
+  const [mode, setMode] = useState(area?.type || 'rect');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    if (mode === 'rect') {
+      setIsDrawing(true);
+      setStartPoint({ x, y });
+      onChange({ type: 'rect', x, y, w: 0, h: 0 });
+    } else {
+      // Lasso / Polygon mode: starts a path or adds a point
+      const newPoints = isDrawing ? [...(area.points || []), { x, y }] : [{ x, y }];
+      setIsDrawing(true);
+      onChange({ type: 'polygon', points: newPoints });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDrawing || !containerRef.current || mode !== 'rect') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const currentX = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const currentY = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+
+    onChange({
+      type: 'rect',
+      x: Math.min(startPoint.x, currentX),
+      y: Math.min(startPoint.y, currentY),
+      w: Math.abs(currentX - startPoint.x),
+      h: Math.abs(currentY - startPoint.y)
+    });
+  };
+
+  const handleMouseUp = () => {
+    if (mode === 'rect') setIsDrawing(false);
+  };
+
+  const handleUndo = () => {
+    if (mode === 'lasso' && area.points?.length > 0) {
+      const newPoints = area.points.slice(0, -1);
+      onChange({ type: 'polygon', points: newPoints });
+      if (newPoints.length === 0) setIsDrawing(false);
+    }
+  };
+
+  const clearSelection = () => {
+    setIsDrawing(false);
+    onChange(mode === 'rect' ? { type: 'rect', x: 0, y: 0, w: 0, h: 0 } : { type: 'polygon', points: [] });
+  };
+
+  return (
+    <div className="flex flex-col gap-4 mt-4">
+      <div className="flex gap-2 justify-center">
+        <button
+          type="button"
+          onClick={() => { setMode('rect'); clearSelection(); }}
+          className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all", mode === 'rect' ? "bg-gold text-bg border-gold" : "border-white/10 text-muted")}
+        >
+          <Square className="w-3.5 h-3.5" /> Marquee
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode('lasso'); clearSelection(); }}
+          className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all", mode === 'lasso' ? "bg-gold text-bg border-gold" : "border-white/10 text-muted")}
+        >
+          <Scissors className="w-3.5 h-3.5" /> Lasso
+        </button>
+        {mode === 'lasso' && area.points?.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={handleUndo}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border border-white/10 text-muted hover:text-white transition-colors"
+            >
+              <Undo2 className="w-3.5 h-3.5" /> Undo
+            </button>
+            {isDrawing && (
+              <button
+                type="button"
+                onClick={() => setIsDrawing(false)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-500 text-white border border-green-600 hover:bg-green-600 transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" /> Confirm Shape
+              </button>
+            )}
+          </>
+        )}
+        <button
+          type="button"
+          onClick={clearSelection}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold border border-white/10 text-muted"
+        >
+          Clear
+        </button>
+      </div>
+
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex justify-center bg-black/20 rounded-xl p-4">
+          <div
+            ref={containerRef}
+            className="relative inline-flex cursor-crosshair select-none"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+          <img src={image} className="max-h-64 w-auto pointer-events-none rounded-lg" alt="Preview" />
+          
+          {mode === 'rect' && area?.type === 'rect' && area.w > 0 && area.h > 0 && (
+            <div
+              className="absolute border-2 border-gold bg-gold/20"
+              style={{
+                left: `${area.x}%`,
+                top: `${area.y}%`,
+                width: `${area.w}%`,
+                height: `${area.h}%`
+              }}
+            />
+          )}
+
+          {mode === 'lasso' && area?.type === 'polygon' && area.points && area.points.length > 0 && (
+            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+              <polygon
+                points={area.points.map((p: any) => `${(p.x * containerRef.current!.offsetWidth) / 100},${(p.y * containerRef.current!.offsetHeight) / 100}`).join(' ')}
+                className="fill-gold/20 stroke-gold stroke-2"
+              />
+              {area.points.map((p: any, i: number) => (
+                <circle
+                  key={i}
+                  cx={`${p.x}%`}
+                  cy={`${p.y}%`}
+                  r="3"
+                  className="fill-gold stroke-bg stroke-1"
+                />
+              ))}
+            </svg>
+          )}
+        </div>
+      </div>
+      {mode === 'lasso' && isDrawing && (
+        <p className="text-[10px] text-muted font-bold uppercase animate-pulse">
+          Click to add points • Close the shape or click Confirm
+        </p>
+      )}
+    </div>
+    </div>
+  )
+};
 
 // --- Dashboard Component ---
 const Dashboard = () => {
@@ -115,8 +275,19 @@ const ProductsManagement = () => {
     original_price: '',
     description: '',
     image: '',
-    images: [] as string[]
+    images: [] as string[],
+    areaType: 'full',
+    customArea: { type: 'rect', x: 0, y: 0, w: 100, h: 100 }
   });
+
+  const handleAreaTypeChange = (type: string) => {
+    let area = newProduct.customArea;
+    if (type === 'full') area = { type: 'rect', x: 0, y: 0, w: 100, h: 100 };
+    else if (type === 'center') area = { type: 'rect', x: 25, y: 25, w: 50, h: 50 };
+    else if (type === 'top_half') area = { type: 'rect', x: 0, y: 0, w: 100, h: 50 };
+    
+    setNewProduct(prev => ({...prev, areaType: type, customArea: area}));
+  };
 
   const categories = ['Album Printing', 'Photo Frames', 'UV Printing', 'Sublimation Gifts'];
 
@@ -136,10 +307,19 @@ const ProductsManagement = () => {
       toast.error('Cannot add product: Supabase not configured.');
       return;
     }
+    
+    let finalDesc = newProduct.description;
+    if (newProduct.customArea) {
+      finalDesc += `___CONFIG___${JSON.stringify(newProduct.customArea)}`;
+    }
+
     const { error } = await supabase.from('products').insert([{
-      ...newProduct,
+      name: newProduct.name,
+      category: newProduct.category,
       price: parseFloat(newProduct.price),
       original_price: parseFloat(newProduct.original_price) || null,
+      description: finalDesc,
+      image: newProduct.image,
       images: newProduct.images.length > 0 ? newProduct.images : [newProduct.image]
     }]);
 
@@ -148,7 +328,7 @@ const ProductsManagement = () => {
     } else {
       toast.success('Product added successfully');
       setIsAdding(false);
-      setNewProduct({ name: '', category: 'Photo Frames', price: '', original_price: '', description: '', image: '', images: [] });
+      setNewProduct({ name: '', category: 'Photo Frames', price: '', original_price: '', description: '', image: '', images: [], areaType: 'full', customArea: { type: 'rect', x: 0, y: 0, w: 100, h: 100 } });
       fetchProducts();
     }
   };
@@ -235,6 +415,37 @@ const ProductsManagement = () => {
                   {newProduct.image && <img src={newProduct.image} className="w-32 h-32 object-cover rounded-xl border border-border" />}
                 </div>
               </div>
+
+              {newProduct.image && (
+                <div>
+                  <label className="block text-xs font-bold text-muted uppercase mb-2">Customization Area</label>
+                  <select 
+                    value={newProduct.areaType} 
+                    onChange={e => handleAreaTypeChange(e.target.value)}
+                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 outline-none focus:border-gold mb-2"
+                  >
+                    <option value="full">Full Image (100%)</option>
+                    <option value="center">Center Square</option>
+                    <option value="top_half">Top Half</option>
+                    <option value="custom">Custom (Draw Marquee on Image below)</option>
+                  </select>
+
+                  <ImageAreaSelector 
+                    image={newProduct.image} 
+                    area={newProduct.customArea} 
+                    onChange={(area: any) => {
+                      if (newProduct.areaType !== 'custom') {
+                        setNewProduct(prev => ({...prev, areaType: 'custom'}));
+                      }
+                      setNewProduct(prev => ({...prev, customArea: area}));
+                    }} 
+                  />
+                  <p className="text-xs text-muted mt-2 text-center">
+                    This defines the area where user uploads will be applied.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-muted uppercase mb-2">Gallery Images (Max 4 more)</label>
                 <div className="grid grid-cols-5 gap-2">
@@ -545,6 +756,7 @@ const FramesManagement = () => {
 // --- Orders Management Component ---
 const OrdersManagement = () => {
   const [orders, setOrders] = useState<any[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const statuses = ['Order Placed', 'Design Under Review', 'Printing in Progress', 'Packed & Ready', 'Out for Delivery', 'Delivered'];
 
   useEffect(() => {
@@ -582,31 +794,66 @@ const OrdersManagement = () => {
           </thead>
           <tbody>
             {orders.map(order => (
-              <tr key={order.id} className="border-b border-border/50 hover:bg-white/5 transition-colors">
-                <td className="p-6 font-mono text-sm text-gold">{order.order_id}</td>
-                <td className="p-6">
-                  <p className="font-bold">{order.customer_name}</p>
-                  <p className="text-xs text-muted">{order.shipping_address?.phone}</p>
-                </td>
-                <td className="p-6 font-bold">₹{order.total}</td>
-                <td className="p-6">
-                  <span className={cn(
-                    "px-3 py-1 text-[10px] font-bold rounded-full uppercase",
-                    order.status === 'Delivered' ? "bg-green-400/10 text-green-400" : "bg-yellow-400/10 text-yellow-400"
-                  )}>
-                    {order.status}
-                  </span>
-                </td>
-                <td className="p-6">
-                  <select 
-                    value={order.status} 
-                    onChange={e => handleUpdateStatus(order.id, e.target.value)}
-                    className="bg-bg border border-border rounded-lg px-3 py-2 text-xs outline-none focus:border-gold"
-                  >
-                    {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </td>
-              </tr>
+              <React.Fragment key={order.id}>
+                <tr 
+                  onClick={() => setSelectedOrderId(selectedOrderId === order.id ? null : order.id)}
+                  className="border-b border-border/50 hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <td className="p-6 font-mono text-sm text-gold">{order.order_id}</td>
+                  <td className="p-6">
+                    <p className="font-bold">{order.customer_name}</p>
+                    <p className="text-xs text-muted">{order.shipping_address?.phone}</p>
+                  </td>
+                  <td className="p-6 font-bold">₹{order.total}</td>
+                  <td className="p-6">
+                    <span className={cn(
+                      "px-3 py-1 text-[10px] font-bold rounded-full uppercase",
+                      order.status === 'Delivered' ? "bg-green-400/10 text-green-400" : "bg-yellow-400/10 text-yellow-400"
+                    )}>
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="p-6" onClick={e => e.stopPropagation()}>
+                    <select 
+                      value={order.status} 
+                      onChange={e => handleUpdateStatus(order.id, e.target.value)}
+                      className="bg-bg border border-border rounded-lg px-3 py-2 text-xs outline-none focus:border-gold"
+                    >
+                      {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                </tr>
+                {selectedOrderId === order.id && (
+                  <tr className="bg-white/[0.02]">
+                    <td colSpan={5} className="p-6 border-b border-border/30">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-start">
+                          <h5 className="text-sm font-bold text-gold uppercase tracking-widest">Order Details</h5>
+                          <div className="text-right text-xs">
+                            <p className="font-bold">Shipping Address:</p>
+                            <p className="text-muted">{order.shipping_address?.address}</p>
+                            <p className="text-muted">{order.shipping_address?.city}, {order.shipping_address?.state} - {order.shipping_address?.pinCode}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {order.items?.map((item: any, idx: number) => (
+                            <div key={idx} className="flex gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                              <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10">
+                                <img src={item.image} className="w-full h-full object-cover" alt="Product" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm">{item.productName}</p>
+                                <p className="text-xs text-muted">Price: ₹{item.price} • Quantity: {item.quantity}</p>
+                                {item.config && <p className="text-[10px] text-gold mt-1">Custom Design Applied</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

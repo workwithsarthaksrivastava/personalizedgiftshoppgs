@@ -96,8 +96,12 @@ export default function Orders() {
               >
                 <div className="flex flex-col md:flex-row justify-between gap-6">
                   <div className="flex gap-6">
-                    <div className="w-16 h-16 bg-gold/10 rounded-2xl flex items-center justify-center text-gold">
-                      <Package className="w-8 h-8" />
+                    <div className="w-16 h-16 bg-gold/10 rounded-2xl flex items-center justify-center text-gold overflow-hidden">
+                      {order.items && order.items[0]?.image ? (
+                        <img src={order.items[0].image} className="w-full h-full object-cover" alt="Product" />
+                      ) : (
+                        <Package className="w-8 h-8" />
+                      )}
                     </div>
                     <div>
                       <h4 className="font-bold text-lg mb-1">{order.order_id}</h4>
