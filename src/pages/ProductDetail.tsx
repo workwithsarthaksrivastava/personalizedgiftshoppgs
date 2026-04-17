@@ -3,7 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useCartStore } from '../cartStore';
 import { toast } from 'sonner';
-import { ShoppingCart, Zap, ChevronLeft } from 'lucide-react';
+import { ShoppingCart, Zap, ChevronLeft, Upload, Edit, Sparkles, Move, ZoomIn, ZoomOut, RotateCcw, Wand2, X as CloseX } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { GoogleGenAI } from "@google/genai";
 import { cn } from '../lib/utils';
 
 export default function ProductDetail() {
@@ -12,7 +14,84 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mainImage, setMainImage] = useState('');
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiAspectRatio, setAiAspectRatio] = useState('1:1');
+  const [isGenerating, setIsGenerating] = useState(false);
   const { addItem, clearCart } = useCartStore();
+
+  const urlToBase64 = async (url: string): Promise<{ data: string, mimeType: string }> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = (reader.result as string).split(',')[1];
+        resolve({ data: base64String, mimeType: blob.type });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const handleGenerateAiImage = async () => {
+    if (!aiPrompt.trim()) return;
+
+    setIsGenerating(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      let contents: any;
+      if (uploadedImage) {
+        const { data, mimeType } = await urlToBase64(uploadedImage);
+        contents = {
+          parts: [
+            { inlineData: { data, mimeType } },
+            { text: `Edit this image based on: ${aiPrompt}` }
+          ]
+        };
+      } else {
+        contents = {
+          parts: [{ text: aiPrompt }],
+        };
+      }
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents,
+        config: {
+          imageConfig: {
+            aspectRatio: aiAspectRatio
+          }
+        }
+      });
+
+      let foundImage = false;
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          const base64Data = part.inlineData.data;
+          const imageUrl = `data:image/png;base64,${base64Data}`;
+          setUploadedImage(imageUrl);
+          setIsCustomizing(true);
+          setShowAiModal(false);
+          foundImage = true;
+          toast.success('Design generated!');
+          break;
+        }
+      }
+      if (!foundImage) toast.error('Model produced no image. Try a different prompt.');
+    } catch (error: any) {
+      console.error('AI Generation error:', error);
+      toast.error('AI Generation failed. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -26,31 +105,67 @@ export default function ProductDetail() {
     fetchProduct();
   }, [id]);
 
-  if (loading) return <div className="min-h-screen bg-bg pt-32 text-center">Loading...</div>;
-  if (!product) return <div className="min-h-screen bg-bg pt-32 text-center">Product not found</div>;
+  useEffect(() => {
+    return () => {
+      if (uploadedImage && uploadedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedImage);
+      }
+    };
+  }, [uploadedImage]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (uploadedImage && uploadedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedImage);
+      }
+      const url = URL.createObjectURL(file);
+      setUploadedImage(url);
+      setIsCustomizing(true);
+    }
+  };
 
   const handleAddToCart = () => {
+    if (!product) return;
     addItem({
       productId: product.id,
       productName: product.name,
       price: product.price,
       quantity: 1,
-      image: mainImage,
+      image: uploadedImage || mainImage,
+      config: uploadedImage ? {
+        originalProductImage: mainImage,
+        customImage: uploadedImage,
+        zoom,
+        rotation,
+        position
+      } : undefined
     });
     toast.success('Added to cart');
   };
 
   const handleBuyNow = () => {
+    if (!product) return;
     clearCart();
     addItem({
       productId: product.id,
       productName: product.name,
       price: product.price,
       quantity: 1,
-      image: mainImage,
+      image: uploadedImage || mainImage,
+      config: uploadedImage ? {
+        originalProductImage: mainImage,
+        customImage: uploadedImage,
+        zoom,
+        rotation,
+        position
+      } : undefined
     });
     navigate('/checkout');
   };
+
+  if (loading) return <div className="min-h-screen bg-bg pt-32 text-center text-white font-bold animate-pulse">Loading Magic...</div>;
+  if (!product) return <div className="min-h-screen bg-bg pt-32 text-center text-white font-bold">Product not found</div>;
 
   const images = product.images || [product.image];
 
@@ -61,21 +176,81 @@ export default function ProductDetail() {
           <ChevronLeft className="w-5 h-5" /> Back to Products
         </Link>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {/* Image Gallery */}
-          <div className="space-y-4">
-            <div className="aspect-square rounded-3xl overflow-hidden glass p-2">
-              <img src={mainImage} alt={product.name} className="w-full h-full object-cover rounded-2xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Image Gallery & Preview */}
+          <div className="space-y-6">
+            <div className="relative aspect-square rounded-[40px] overflow-hidden glass p-4 group">
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key={isCustomizing ? 'custom' : 'product'}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full h-full relative"
+                >
+                  {isCustomizing && uploadedImage ? (
+                    <div className="w-full h-full relative bg-white/5 rounded-3xl overflow-hidden flex items-center justify-center">
+                      {/* Undelaying Product Image as Background (Low Opacity) */}
+                      <img 
+                        src={mainImage} 
+                        className="absolute inset-0 w-full h-full object-contain opacity-30 select-none pointer-events-none" 
+                        alt=""
+                      />
+                      
+                      {/* User's Uploaded Image with Controls */}
+                      <motion.div
+                        drag
+                        dragMomentum={false}
+                        onDragEnd={(_, info) => setPosition({ x: info.offset.x, y: info.offset.y })}
+                        style={{ x: position.x, y: position.y, scale: zoom, rotate: rotation }}
+                        className="w-48 h-48 cursor-move relative z-10"
+                      >
+                        <img 
+                          src={uploadedImage} 
+                          className="w-full h-full object-cover rounded-lg shadow-2xl border-2 border-gold/50" 
+                          alt="Custom preview"
+                        />
+                        <div className="absolute -top-3 -right-3 bg-gold p-1 rounded-full shadow-lg">
+                          <Move className="w-4 h-4 text-bg" />
+                        </div>
+                      </motion.div>
+
+                      {/* Floating Controls for Customization */}
+                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 glass px-4 py-2 rounded-2xl border-white/10 shadow-2xl">
+                        <button onClick={() => setZoom(z => Math.max(0.2, z - 0.1))} className="p-1.5 hover:text-gold transition-colors"><ZoomOut className="w-4 h-4" /></button>
+                        <div className="w-px h-4 bg-border" />
+                        <button onClick={() => setRotation(r => r - 90)} className="p-1.5 hover:text-gold transition-colors"><RotateCcw className="w-4 h-4" /></button>
+                        <div className="w-px h-4 bg-border" />
+                        <button onClick={() => setZoom(z => Math.min(5, z + 0.1))} className="p-1.5 hover:text-gold transition-colors"><ZoomIn className="w-4 h-4" /></button>
+                      </div>
+
+                      <button 
+                        onClick={() => setIsCustomizing(false)}
+                        className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-xs font-bold"
+                      >
+                        Exit Preview
+                      </button>
+                    </div>
+                  ) : (
+                    <img 
+                      src={mainImage} 
+                      alt={product.name} 
+                      className="w-full h-full object-contain rounded-3xl" 
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
             </div>
-            {images.length > 1 && (
-              <div className="flex gap-4 overflow-x-auto pb-2">
+
+            {images.length > 1 && !isCustomizing && (
+              <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
                 {images.map((img: string, idx: number) => (
                   <button 
                     key={idx} 
                     onClick={() => setMainImage(img)}
                     className={cn(
-                      "w-24 h-24 rounded-xl overflow-hidden border-2 transition-all shrink-0",
-                      mainImage === img ? "border-gold" : "border-transparent opacity-70 hover:opacity-100"
+                      "w-24 h-24 rounded-2xl overflow-hidden border-2 transition-all shrink-0 glass",
+                      mainImage === img ? "border-gold scale-95" : "border-transparent opacity-70 hover:opacity-100"
                     )}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
@@ -83,23 +258,162 @@ export default function ProductDetail() {
                 ))}
               </div>
             )}
+
+            {/* Customization Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="flex items-center justify-center gap-3 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl cursor-pointer hover:bg-white/10 transition-all group">
+                <Upload className="w-5 h-5 text-gold group-hover:scale-110 transition-transform" />
+                <div className="text-left">
+                  <p className="font-bold text-sm">{uploadedImage ? 'Change Photo' : 'Upload Your Photo'}</p>
+                  <p className="text-[10px] text-muted">Use your own memories</p>
+                </div>
+                <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
+              </label>
+              <button 
+                onClick={() => setShowAiModal(true)}
+                className="flex items-center justify-center gap-3 px-6 py-4 bg-gold/5 border border-gold/20 rounded-2xl hover:bg-gold/10 transition-all group border-dashed"
+              >
+                <Wand2 className="w-5 h-5 text-gold group-hover:rotate-12 transition-transform" />
+                <div className="text-left">
+                  <p className="font-bold text-sm text-gold">AI Generate</p>
+                  <p className="text-[10px] text-gold/60">Create unique art with AI</p>
+                </div>
+              </button>
+            </div>
           </div>
+
+          {/* AI Generation Modal */}
+          <AnimatePresence>
+            {showAiModal && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => !isGenerating && setShowAiModal(false)}
+                  className="absolute inset-0 bg-bg/90 backdrop-blur-xl"
+                />
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="relative w-full max-w-xl glass p-8 rounded-[40px] border-white/10 shadow-2xl"
+                >
+                  <button 
+                    onClick={() => setShowAiModal(false)}
+                    className="absolute top-6 right-6 p-2 hover:bg-white/5 rounded-full transition-colors"
+                  >
+                    <CloseX className="w-6 h-6" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-gold/10 rounded-2xl border border-gold/20">
+                      {uploadedImage ? <Edit className="w-6 h-6 text-gold" /> : <Sparkles className="w-6 h-6 text-gold" />}
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-display font-bold">
+                        {uploadedImage ? 'AI Image Editor' : 'AI Design Studio'}
+                      </h3>
+                      <p className="text-sm text-muted">
+                        {uploadedImage ? 'Tell AI how to transform your photo' : 'Describe the design you want to create'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    {uploadedImage && (
+                      <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <img src={uploadedImage} className="w-16 h-16 object-cover rounded-lg border border-white/10" alt="Reference" />
+                        <div className="flex-grow">
+                          <p className="text-xs font-bold text-gold">Editing Mode Active</p>
+                          <p className="text-[10px] text-muted">AI will use your photo as a baseline for generation</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-muted uppercase">Aspect Ratio</label>
+                      <select 
+                        value={aiAspectRatio}
+                        onChange={(e) => setAiAspectRatio(e.target.value)}
+                        className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-gold text-sm text-white"
+                      >
+                        <option className="bg-gray-900 text-white" value="1:1">1:1 (Square)</option>
+                        <option className="bg-gray-900 text-white" value="3:4">3:4 (Portrait)</option>
+                        <option className="bg-gray-900 text-white" value="4:3">4:3 (Landscape)</option>
+                        <option className="bg-gray-900 text-white" value="9:16">9:16 (Vertical)</option>
+                        <option className="bg-gray-900 text-white" value="16:9">16:9 (Widescreen)</option>
+                      </select>
+                    </div>
+
+                    <div className="relative">
+                      <textarea 
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder={uploadedImage ? "Example: Add a cinematic sunset background, make it look like an oil painting..." : "Example: A vibrant sunset with silhouette of a family, cinematic lighting..."}
+                        className="w-full bg-bg border border-white/10 rounded-2xl p-6 outline-none focus:border-gold h-40 resize-none transition-all placeholder:text-muted/50"
+                      />
+                      <div className="absolute bottom-4 right-4 text-[10px] text-muted italic">
+                        Powered by Gemini
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={handleGenerateAiImage}
+                      disabled={isGenerating || !aiPrompt.trim()}
+                      className={cn(
+                        "w-full py-5 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all",
+                        isGenerating || !aiPrompt.trim() 
+                          ? "bg-white/5 text-muted cursor-not-allowed" 
+                          : "gold-gradient text-bg hover:scale-[1.02]"
+                      )}
+                    >
+                      {isGenerating ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-bg/30 border-t-bg rounded-full animate-spin" />
+                          <span>Generating Art...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-5 h-5" />
+                          <span>Generate Design</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      {['Family Portrait', 'Minimalist Nature', 'Pop Art Style'].map(preset => (
+                        <button 
+                          key={preset}
+                          onClick={() => setAiPrompt(preset)}
+                          className="text-[10px] font-bold p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
 
           {/* Product Info */}
           <div className="flex flex-col">
-            <span className="text-gold font-bold tracking-widest uppercase text-sm mb-2">{product.category}</span>
-            <h1 className="text-4xl md:text-5xl font-display font-bold mb-4">{product.name}</h1>
-            
-            <div className="flex items-end gap-4 mb-8">
-              <span className="text-4xl font-bold text-gold">₹{product.price}</span>
-              {product.original_price && product.original_price > product.price && (
-                <span className="text-xl text-muted line-through mb-1">₹{product.original_price}</span>
-              )}
-              {product.original_price && product.original_price > product.price && (
-                <span className="text-sm font-bold text-green-400 mb-2 bg-green-400/10 px-2 py-1 rounded">
-                  {Math.round(((product.original_price - product.price) / product.original_price) * 100)}% OFF
-                </span>
-              )}
+            <div className="mb-8">
+              <span className="px-3 py-1 bg-gold/10 text-gold rounded-full font-bold tracking-widest uppercase text-[10px] mb-4 inline-block border border-gold/20">
+                {product.category}
+              </span>
+              <h1 className="text-4xl md:text-5xl font-display font-bold mb-4 bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic">
+                {product.name}
+              </h1>
+              
+              <div className="flex items-baseline gap-4">
+                <span className="text-5xl font-bold text-gold">₹{product.price}</span>
+                {product.original_price && product.original_price > product.price && (
+                  <span className="text-xl text-muted line-through">₹{product.original_price}</span>
+                )}
+              </div>
             </div>
 
             <div className="prose prose-invert mb-10">

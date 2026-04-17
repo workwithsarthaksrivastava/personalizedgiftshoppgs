@@ -293,6 +293,7 @@ const ProductsManagement = () => {
 // --- Frames Management Component ---
 const FramesManagement = () => {
   const [frames, setFrames] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [editingFrame, setEditingFrame] = useState<any>(null);
   const [newFrame, setNewFrame] = useState({
