@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Mail, Lock, LogIn, UserPlus, Chrome, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'sonner';
 
@@ -12,17 +12,38 @@ export default function Login() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const navigate = useNavigate();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!agreed) {
+      toast.error('You must agree to the Terms of Service and Privacy Policy to proceed');
+      return;
+    }
+    
     setLoading(true);
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast.success('Welcome back!');
+        
+        if (data?.user && name.trim()) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert([
+              {
+                id: data.user.id,
+                full_name: name,
+                email: email,
+                role: 'customer',
+              }
+            ], { onConflict: 'id' });
+          if (profileError) console.error('Error syncing profile:', profileError);
+        }
+        
+        toast.success(`Welcome back, ${name || 'User'}!`);
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -57,20 +78,6 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      toast.error(error.message || 'An error occurred during Google login');
-    }
-  };
-
   return (
     <div className="min-h-screen pt-32 pb-20 px-6 flex items-center justify-center">
       <div className="absolute inset-0 z-0 opacity-20">
@@ -93,34 +100,32 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleAuth} className="space-y-6">
-          {!isLogin && (
-            <div>
-              <label className="block text-xs font-bold text-muted uppercase tracking-widest mb-2">Full Name</label>
-              <div className="relative">
-                <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted" />
-                <input 
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-bg border border-border rounded-xl pl-12 pr-4 py-3 focus:border-gold outline-none transition-colors"
-                  placeholder="John Doe"
-                />
-              </div>
+          <div>
+            <label className="block text-xs font-bold text-muted uppercase tracking-widest mb-2">Full Name</label>
+            <div className="relative">
+              <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted" />
+              <input 
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-bg border border-border rounded-xl pl-12 pr-4 py-3 focus:border-gold outline-none transition-colors"
+                placeholder="John Doe"
+              />
             </div>
-          )}
+          </div>
 
           <div>
-            <label className="block text-xs font-bold text-muted uppercase tracking-widest mb-2">Email or Username</label>
+            <label className="block text-xs font-bold text-muted uppercase tracking-widest mb-2">Email Address</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted" />
               <input 
-                type="text"
+                type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-bg border border-border rounded-xl pl-12 pr-4 py-3 focus:border-gold outline-none transition-colors"
-                placeholder="john@example.com or username"
+                placeholder="john@example.com"
               />
             </div>
           </div>
@@ -147,6 +152,27 @@ export default function Login() {
             </div>
           </div>
 
+          <div className="flex items-start gap-2.5 pt-1">
+            <input 
+              type="checkbox"
+              id="agree_terms"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="w-4 h-4 mt-0.5 rounded border-border text-gold bg-bg accent-gold cursor-pointer shrink-0"
+              required
+            />
+            <label htmlFor="agree_terms" className="text-xs text-muted leading-relaxed cursor-pointer select-none">
+              I agree to the{' '}
+              <Link to="/terms" target="_blank" className="text-gold font-bold hover:underline">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link to="/privacy" target="_blank" className="text-gold font-bold hover:underline">
+                Privacy Policy
+              </Link>.
+            </label>
+          </div>
+
           <button 
             type="submit"
             disabled={loading}
@@ -156,23 +182,6 @@ export default function Login() {
             {!loading && <LogIn className="w-5 h-5" />}
           </button>
         </form>
-
-        <div className="mt-8">
-          <div className="relative flex items-center justify-center mb-8">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
-            <span className="relative bg-surface px-4 text-xs text-muted uppercase tracking-widest">Or continue with</span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            <button 
-              onClick={handleGoogleLogin}
-              className="flex items-center justify-center gap-3 py-3 glass rounded-xl hover:bg-white/5 transition-colors"
-            >
-              <Chrome className="w-5 h-5" />
-              <span className="text-sm font-medium">Google</span>
-            </button>
-          </div>
-        </div>
 
         <p className="mt-10 text-center text-sm text-muted">
           {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}

@@ -31,3 +31,14 @@
 .gold-gradient {
   background: linear-gradient(135deg, #C9A84C 0%, #E8D08A 100%);
 }
+
+@keyframes blink-glow {
+  0% { opacity: 1; text-shadow: 0 0 10px #C9A84C, 0 0 20px #C9A84C; }
+  50% { opacity: 0.5; text-shadow: 0 0 5px #C9A84C, 0 0 10px #C9A84C; }
+  100% { opacity: 1; text-shadow: 0 0 10px #C9A84C, 0 0 20px #C9A84C; }
+}
+
+.blink-gold {
+  animation: blink-glow 2s infinite;
+  color: #C9A84C;
+}

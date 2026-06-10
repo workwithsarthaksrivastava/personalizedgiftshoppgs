@@ -37,7 +37,9 @@ export default function Navbar() {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Products', path: '/products' },
-    { name: 'Customize', path: '/customize' },
+    { name: 'Frame Studio', path: '/frame-studio' },
+    { name: 'Enterprise', path: '/enterprise' },
+    { name: 'Wishlist', path: '/wishlist' },
     { name: 'My Orders', path: '/orders' },
     { name: 'Track Order', path: '/track' },
     { name: 'Contact', path: '/contact' },
@@ -88,7 +90,7 @@ export default function Navbar() {
               </span>
             )}
           </Link>
-          <Link to={user ? "/orders" : "/login"} className="p-2 hover:text-gold transition-colors">
+          <Link to={user ? "/profile" : "/login"} className="p-2 hover:text-gold transition-colors">
             <User className="w-6 h-6" />
           </Link>
           <button

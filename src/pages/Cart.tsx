@@ -42,7 +42,7 @@ export default function Cart() {
                   className="glass p-6 rounded-2xl flex flex-col sm:flex-row items-center gap-6"
                 >
                   <img 
-                    src={item.image} 
+                    src={item.config?.customizedImageUrl || item.config?.uploadedImage || item.image} 
                     alt={item.productName} 
                     className="w-24 h-24 object-cover rounded-xl"
                     referrerPolicy="no-referrer"
@@ -87,6 +87,18 @@ export default function Cart() {
           <div className="lg:col-span-1">
             <div className="glass p-8 rounded-3xl sticky top-32">
               <h3 className="text-2xl font-display font-bold text-gold mb-6">Order Summary</h3>
+              
+              {/* Promo Banner */}
+              <div className="mb-6 p-4 rounded-2xl bg-gold/5 border border-gold/15 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-gold text-bg font-black px-2 py-0.5 rounded tracking-wider">WELCOME100</span>
+                  <span className="text-[10px] text-green-400 font-bold uppercase">First Order Special</span>
+                </div>
+                <p className="text-xs text-white/80 font-light leading-relaxed">
+                  Apply during checkout to get <strong className="text-gold font-bold">flat ₹100 off</strong> on every product in your cart!
+                </p>
+              </div>
+
               <div className="space-y-4 mb-8">
                 <div className="flex justify-between text-muted">
                   <span>Subtotal</span>

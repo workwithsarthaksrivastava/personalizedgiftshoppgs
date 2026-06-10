@@ -8,6 +8,7 @@ import Footer from './components/Footer';
 const Home = lazy(() => import('./pages/Home'));
 const Products = lazy(() => import('./pages/Products'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const FrameStudio = lazy(() => import('./pages/FrameStudio'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Login = lazy(() => import('./pages/Login'));
 const Admin = lazy(() => import('./pages/Admin'));
@@ -16,7 +17,11 @@ const Cart = lazy(() => import('./pages/Cart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const TrackOrder = lazy(() => import('./pages/TrackOrder'));
 const Orders = lazy(() => import('./pages/Orders'));
-const Customize = lazy(() => import('./pages/Customize'));
+const Enterprise = lazy(() => import('./pages/Enterprise'));
+const Wishlist = lazy(() => import('./pages/Wishlist'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center bg-bg">
@@ -34,6 +39,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/products" element={<Products />} />
+              <Route path="/frame-studio" element={<FrameStudio />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />
@@ -43,7 +49,11 @@ export default function App() {
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/track" element={<TrackOrder />} />
               <Route path="/orders" element={<Orders />} />
-              <Route path="/customize" element={<Customize />} />
+              <Route path="/enterprise" element={<Enterprise />} />
+              <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
             </Routes>
           </Suspense>
         </main>
