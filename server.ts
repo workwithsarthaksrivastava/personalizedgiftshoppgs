@@ -34,6 +34,168 @@ async function startServer() {
     return createClient(url, key);
   };
 
+  // State to track last executed database keep-alive check
+  let lastCheckedTime = 0;
+  const STATUS_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // Check every 12 hours
+
+  const runDatabaseKeepAliveCheck = async () => {
+    const supabaseClient = getSupabaseClient();
+    if (!supabaseClient) {
+      console.log("[Keep-Alive] Supabase client is not configured yet. Skipping search / insert keep-alive.");
+      return;
+    }
+
+    try {
+      console.log("[Keep-Alive] Starting database activity keep-alive check...");
+
+      // 1. Check if the marker product exists
+      const { data: markerData, error: markerError } = await supabaseClient
+        .from('products')
+        .select('*')
+        .eq('name', '_SYSTEM_LAST_PING_')
+        .eq('category', '_SUBSECTION_')
+        .limit(1);
+
+      if (markerError) {
+        console.error("[Keep-Alive] Error querying marker product:", markerError.message);
+        return;
+      }
+
+      const now = Date.now();
+      const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+      let shouldPing = false;
+      let markerId: string | null = null;
+
+      if (!markerData || markerData.length === 0) {
+        console.log("[Keep-Alive] No marker product found. Preparing to establish marker and run demo activity.");
+        shouldPing = true;
+      } else {
+        const marker = markerData[0];
+        markerId = marker.id;
+        
+        // Parse the last_ping timestamp
+        let lastPing = 0;
+        try {
+          const configParts = (marker.description || '').split('___CONFIG___');
+          if (configParts.length > 1) {
+            const config = JSON.parse(configParts[1]);
+            lastPing = Number(config.last_ping) || 0;
+          }
+        } catch (e) {
+          console.error("[Keep-Alive] Error parsing last_ping from description config:", e);
+        }
+
+        const elapsed = now - lastPing;
+        console.log(`[Keep-Alive] Last ping occurred ${Math.round(elapsed / (1000 * 60 * 60))} hours ago.`);
+
+        if (elapsed >= sixDaysMs) {
+          console.log("[Keep-Alive] More than 6 days have passed since last write. Running active keep-alive write...");
+          shouldPing = true;
+        } else {
+          console.log("[Keep-Alive] Database activity is fresh. Next check scheduled in approximately " + 
+            ((sixDaysMs - elapsed) / (1000 * 60 * 60 * 24)).toFixed(1) + " days.");
+        }
+      }
+
+      if (shouldPing) {
+        // A. Update or Create the Keep-Alive marker with the new timestamp so other server instances don't double-trigger
+        const updatedConfig = `___CONFIG___${JSON.stringify({ parent_category: '_SYSTEM_INTERNAL_', last_ping: now })}`;
+        
+        if (markerId) {
+          const { error: updateError } = await supabaseClient
+            .from('products')
+            .update({ description: updatedConfig })
+            .eq('id', markerId);
+          if (updateError) {
+            console.error("[Keep-Alive] Failed to update marker timestamp:", updateError.message);
+            return;
+          }
+        } else {
+          const { data: newMarker, error: createError } = await supabaseClient
+            .from('products')
+            .insert([{
+              name: '_SYSTEM_LAST_PING_',
+              category: '_SUBSECTION_',
+              price: 0,
+              description: updatedConfig,
+              image: 'https://images.unsplash.com/photo-1546051888-791244c193e0?auto=format&fit=crop&q=80&w=300'
+            }])
+            .select();
+
+          if (createError) {
+            console.error("[Keep-Alive] Failed to create marker product:", createError.message);
+            return;
+          }
+          if (newMarker && newMarker[0]) {
+            markerId = newMarker[0].id;
+          }
+        }
+
+        // B. Add the temporary demo product to generate write activity
+        console.log("[Keep-Alive] Inserting temporary demo product for active database keeping...");
+        const demoConfig = `___CONFIG___${JSON.stringify({ parent_category: '_SYSTEM_INTERNAL_', is_demo: true })}`;
+        const { data: demoProducts, error: demoInsertError } = await supabaseClient
+          .from('products')
+          .insert([{
+            name: '_SYSTEM_DEMO_PRODUCT_',
+            category: '_SUBSECTION_',
+            price: 0,
+            description: demoConfig,
+            image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&q=80&w=300'
+          }])
+          .select();
+
+        if (demoInsertError) {
+          console.error("[Keep-Alive] Failed to insert temporary demo product:", demoInsertError.message);
+          return;
+        }
+
+        const demoProduct = demoProducts ? demoProducts[0] : null;
+        if (!demoProduct) {
+          console.error("[Keep-Alive] Temporary demo product was not returned on insert.");
+          return;
+        }
+
+        console.log(`[Keep-Alive] Temporary demo product inserted successfully with ID: ${demoProduct.id}. Waiting 25 seconds before deletion...`);
+
+        // C. Sleep for 25 seconds then delete the demo product (completed in < 30 seconds as requested)
+        setTimeout(async () => {
+          try {
+            console.log(`[Keep-Alive] Deleting temporary product ${demoProduct.id} from database now...`);
+            const { error: deleteError } = await supabaseClient
+              .from('products')
+              .delete()
+              .eq('id', demoProduct.id);
+
+            if (deleteError) {
+              console.error(`[Keep-Alive] Error deleting temporary demo product ${demoProduct.id}:`, deleteError.message);
+            } else {
+              console.log("[Keep-Alive] Success! Temporary demo product deleted successfully. Database successfully kept active.");
+            }
+          } catch (deleteErr: any) {
+            console.error("[Keep-Alive] Exception occurred during temporary product cleanup:", deleteErr);
+          }
+        }, 25000); // 25 seconds (less than 30 seconds)
+      }
+
+    } catch (err: any) {
+      console.error("[Keep-Alive] Unhandled exception in runDatabaseKeepAliveCheck:", err);
+    }
+  };
+
+  // Express middleware to trigger the check asynchronously on occasional routes (debounced to once every 12 hours)
+  app.use((req, res, next) => {
+    const now = Date.now();
+    if (now - lastCheckedTime > STATUS_CHECK_INTERVAL_MS) {
+      lastCheckedTime = now;
+      // Triggers asynchronously so we don't slow down high-priority user requests
+      runDatabaseKeepAliveCheck().catch(err => {
+        console.error("[Keep-Alive] Async keep-alive execution error:", err);
+      });
+    }
+    next();
+  });
+
   // Razorpay order creation endpoint
   app.post("/api/create-razorpay-order", async (req, res) => {
     try {
@@ -316,6 +478,21 @@ Extract the structured search criteria from the user's natural language input.
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Perform an immediate keep-alive check on server startup
+  console.log("[Keep-Alive] Server booting. Initiating startup database keep-alive check...");
+  lastCheckedTime = Date.now();
+  runDatabaseKeepAliveCheck().catch(err => {
+    console.error("[Keep-Alive] Startup keep-alive check failed:", err);
+  });
+
+  // Set up continuous polling every 12 hours in case the container remains warm continuously
+  setInterval(() => {
+    console.log("[Keep-Alive] Running scheduled periodic keep-alive check...");
+    runDatabaseKeepAliveCheck().catch(err => {
+      console.error("[Keep-Alive] Periodic keep-alive check failed:", err);
+    });
+  }, STATUS_CHECK_INTERVAL_MS);
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
