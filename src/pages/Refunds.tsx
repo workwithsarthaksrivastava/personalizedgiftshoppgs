@@ -79,7 +79,7 @@ export default function Refunds() {
             <div className="space-y-4 pt-4 border-t border-border mt-6">
               <h3 className="text-xl font-bold text-gold border-b border-border pb-2 w-full">6. Contact Us</h3>
               <div className="space-y-2 text-sm text-white/90 pt-2">
-                <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur (Surya Films Services)</p>
+                <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur, a brand operated by Surya Films Services</p>
                 <p>Email: <a href="mailto:Suryafilmsservices@gmail.com" className="text-gold hover:underline">Suryafilmsservices@gmail.com</a></p>
                 <p>Phone: +91 79797 12803</p>
                 <p>Address: New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India — 842001</p>

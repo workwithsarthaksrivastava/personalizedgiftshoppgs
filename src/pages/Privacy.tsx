@@ -14,10 +14,10 @@ export default function Privacy() {
           </div>
           <h1 className="text-5xl font-bold text-gold mb-4">Privacy Policy</h1>
           <p className="text-muted">
-            Last Updated: June 10, 2026
+            Last Updated: June 13, 2026
           </p>
           <p className="text-muted max-w-2xl mx-auto mt-2">
-            Welcome to <span className="text-white font-medium">Personalized Gift Shop</span> (operated under the legal entity <span className="text-gold font-medium">Surya Films Services</span>). This Privacy Policy explains how we collect, use, disclose, and protect your information when you visit <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and use our services.
+            Welcome to <span className="text-white font-medium">Personalized Gift Shop Muzaffarpur, a brand operated by Surya Films Services</span>. This Privacy Policy explains how we collect, use, disclose, and protect your information when you visit <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and use our services. By using our website and services, you consent to the collection and processing of your information as described in this Privacy Policy.
           </p>
         </div>
 
@@ -156,11 +156,37 @@ export default function Privacy() {
             </div>
           </div>
 
+          {/* Card 7: Third-Party Services */}
+          <div className="glass p-8 md:p-10 rounded-3xl space-y-4">
+            <h3 className="text-2xl font-bold text-gold border-b border-border pb-4">8. Third-Party Services</h3>
+            <p className="text-sm text-muted leading-relaxed">
+              We may use trusted third-party service providers, including payment gateways, hosting providers, analytics services, and shipping partners to facilitate our business operations. These providers receive only the information necessary to perform their services.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Card 8: Children's Privacy */}
+            <div className="glass p-8 rounded-3xl space-y-4">
+              <h3 className="text-xl font-bold text-gold border-b border-border pb-2">9. Children's Privacy</h3>
+              <p className="text-sm text-muted leading-relaxed">
+                Our services are not directed toward individuals under the age of 18. We do not knowingly collect personal information from children.
+              </p>
+            </div>
+
+            {/* Card 9: Changes to Policy */}
+            <div className="glass p-8 rounded-3xl space-y-4">
+              <h3 className="text-xl font-bold text-gold border-b border-border pb-2">10. Changes to Policy</h3>
+              <p className="text-sm text-muted leading-relaxed">
+                We may update this Privacy Policy from time to time. Changes will be posted on this page along with the updated revision date.
+              </p>
+            </div>
+          </div>
+
           {/* Contact Section */}
           <div className="glass p-8 md:p-10 rounded-3xl space-y-6">
-            <h2 className="text-3xl font-bold text-gold border-b border-border pb-4 w-full">8. Contact Information</h2>
+            <h2 className="text-3xl font-bold text-gold border-b border-border pb-4 w-full">11. Contact Information</h2>
             <div className="space-y-2 text-sm text-white/90">
-              <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur (Surya Films Services)</p>
+              <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur, a brand operated by Surya Films Services</p>
               <p>Email: <a href="mailto:Suryafilmsservices@gmail.com" className="text-gold">Suryafilmsservices@gmail.com</a></p>
               <p>Phone: +91 79797 12803</p>
               <p>Address: New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India — 842001</p>

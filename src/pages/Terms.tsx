@@ -14,10 +14,10 @@ export default function Terms() {
           </div>
           <h1 className="text-5xl font-bold text-gold mb-4 font-display">Terms & Conditions</h1>
           <p className="text-muted text-sm">
-            Last Updated: June 10, 2026
+            Last Updated: June 13, 2026
           </p>
           <p className="text-muted max-w-2xl mx-auto mt-3 text-sm leading-relaxed">
-            Welcome to <span className="text-white font-semibold">Personalized Gift Shop Muzaffarpur</span> (operated under the registered legal entity <span className="text-gold font-medium">Surya Films Services</span>, hereafter referred to as "Company", "we", "our", or "us"). These Terms and Conditions govern your access to and use of <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and the products and services offered through our website.
+            Welcome to <span className="text-white font-semibold">Personalized Gift Shop Muzaffarpur, a brand operated by Surya Films Services</span> (hereafter referred to as "Company", "we", "our", or "us"). These Terms and Conditions govern your access to and use of <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and the products and services offered through our website.
           </p>
         </div>
 
@@ -188,7 +188,7 @@ export default function Terms() {
           <div className="glass p-8 md:p-10 rounded-3xl space-y-6">
             <h2 className="text-3xl font-bold text-gold border-b border-border pb-4 w-full">11. Contact Information</h2>
             <div className="space-y-2 text-sm text-white/90">
-              <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur (Surya Films Services)</p>
+              <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur, a brand operated by Surya Films Services</p>
               <p>Email: <a href="mailto:Suryafilmsservices@gmail.com" className="text-gold">Suryafilmsservices@gmail.com</a></p>
               <p>Phone: +91 79797 12803</p>
               <p>Address: New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India — 842001</p>
