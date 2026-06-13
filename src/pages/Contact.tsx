@@ -16,11 +16,24 @@ export default function Contact() {
   return (
     <div className="pt-32 pb-20 px-6">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gold mb-4">Get In Touch</h1>
-          <p className="text-muted max-w-2xl mx-auto">
-            Have questions about our services or need a custom quote? We're here to help you create the perfect gift.
+        <div className="text-center mb-10">
+          <h1 className="text-5xl font-bold text-gold mb-4">Contact Us</h1>
+          <p className="text-xl text-white font-bold mb-2">Personalized Gift Shop Muzaffarpur</p>
+          <p className="text-md text-white/90 mb-4">Customized Gifts, Photo Frames, Albums, Sublimation Products & Corporate Gifts</p>
+          <p className="text-sm text-muted max-w-2xl mx-auto mb-6">
+            Personalized Gift Shop Muzaffarpur is a gifting and customization business operated by Surya Films Services.
           </p>
+        </div>
+
+        <div className="glass p-8 mb-12 rounded-3xl max-w-4xl mx-auto border border-gold/20">
+          <h2 className="text-2xl font-bold text-gold mb-4">Business Identity Details</h2>
+          <div className="space-y-2 text-sm text-white/90">
+            <p><strong className="text-white">Business Name:</strong> Personalized Gift Shop Muzaffarpur</p>
+            <p><strong className="text-white">Email:</strong> <a href="mailto:suryafilmsservices@gmail.com" className="text-gold">suryafilmsservices@gmail.com</a></p>
+            <p><strong className="text-white">Phone:</strong> +91 79797 12803</p>
+            <p><strong className="text-white">Address:</strong> New Market, Chowk, Near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar – 842001, India</p>
+            <p><strong className="text-white">Website:</strong> www.personalizedgiftshop.in</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
@@ -31,15 +44,15 @@ export default function Contact() {
                 <div className="p-3 bg-gold/10 rounded-xl text-gold"><Phone className="w-6 h-6" /></div>
                 <div>
                   <h4 className="font-bold mb-1">Call Us</h4>
-                  <p className="text-sm text-muted">+91 79 7971 2803</p>
-                  <p className="text-sm text-muted">+91 99 3443 5453</p>
+                  <p className="text-sm text-muted">+91 79797 12803</p>
+                  <p className="text-sm text-muted">+91 99344 35453</p>
                 </div>
               </div>
               <div className="glass p-6 rounded-2xl flex items-start gap-4">
                 <div className="p-3 bg-gold/10 rounded-xl text-gold"><Mail className="w-6 h-6" /></div>
                 <div>
                   <h4 className="font-bold mb-1">Email Us</h4>
-                  <p className="text-sm text-muted">Suryafilmsservices@gmail.com</p>
+                  <p className="text-sm text-muted">suryafilmsservices@gmail.com</p>
                 </div>
               </div>
               <div className="glass p-6 rounded-2xl flex items-start gap-4 sm:col-span-2">
@@ -47,7 +60,7 @@ export default function Contact() {
                 <div>
                   <h4 className="font-bold mb-1">Visit Us</h4>
                   <p className="text-sm text-muted">
-                    New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar — 842001
+                    New Market, Chowk, Near Bihar Jalpan,<br/>Shrirampuri, Bhagwanpur,<br/>Muzaffarpur, Bihar – 842001, India
                   </p>
                 </div>
               </div>
@@ -57,6 +70,17 @@ export default function Contact() {
                   <h4 className="font-bold mb-1">Business Hours</h4>
                   <p className="text-sm text-muted">Mon–Sat: 9:00 AM – 8:00 PM</p>
                   <p className="text-sm text-muted">Sunday: 10:00 AM – 5:00 PM</p>
+                  <p className="text-sm text-muted mt-2"><strong>Response Time:</strong> We typically respond to customer inquiries within 24–48 business hours.</p>
+                </div>
+              </div>
+
+              <div className="glass p-6 rounded-2xl flex items-start gap-4 sm:col-span-2">
+                <div className="p-3 bg-gold/10 rounded-xl text-gold"><MessageCircle className="w-6 h-6" /></div>
+                <div>
+                  <h4 className="font-bold mb-1">Order Support</h4>
+                  <p className="text-sm text-muted">
+                    For order inquiries, customization requests, refunds, cancellations, shipping updates, and payment-related concerns, please contact us via phone or email.
+                  </p>
                 </div>
               </div>
             </div>
@@ -145,6 +169,10 @@ export default function Contact() {
               </button>
             </form>
           </div>
+        </div>
+        
+        <div className="mt-16 text-center text-sm text-muted">
+          Last Updated: 13 June 2026
         </div>
       </div>
     </div>
