@@ -12,12 +12,12 @@ export default function Terms() {
           <div className="inline-flex p-3 bg-gold/10 rounded-full text-gold mb-4">
             <FileText className="w-8 h-8" />
           </div>
-          <h1 className="text-5xl font-bold text-gold mb-4 font-display">Terms of Service</h1>
+          <h1 className="text-5xl font-bold text-gold mb-4 font-display">Terms & Conditions</h1>
           <p className="text-muted text-sm">
             Last Updated: June 10, 2026
           </p>
           <p className="text-muted max-w-2xl mx-auto mt-3 text-sm leading-relaxed">
-            Welcome to <span className="text-white font-semibold">Personalized Gift Shop</span> (operated under the registered legal entity <span className="text-gold font-medium">Surya Films Services</span>, hereafter referred to as "Company", "we", "our", or "us"). These Terms and Conditions govern your access to and use of <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and the products and services offered through our website.
+            Welcome to <span className="text-white font-semibold">Personalized Gift Shop Muzaffarpur</span> (operated under the registered legal entity <span className="text-gold font-medium">Surya Films Services</span>, hereafter referred to as "Company", "we", "our", or "us"). These Terms and Conditions govern your access to and use of <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and the products and services offered through our website.
           </p>
         </div>
 
@@ -106,7 +106,7 @@ export default function Terms() {
             <ul className="list-disc pl-6 space-y-3 text-sm text-muted">
               <li><strong className="text-white">Currencies:</strong> All product listings are declared in Indian Rupees (INR - ₹).</li>
               <li><strong className="text-white">Updates:</strong> Quotations may be dynamically modified without prior notice. Taxes and shipping tolls are added sequentially in the Checkout phase.</li>
-              <li><strong className="text-white">Payment Options:</strong> Payments are processed safely through certified third-party services (incorporating credit/debit card processors, UPI systems, Net Banking, and wallet providers). Fabrication starts only after transaction confirmations are compiled.</li>
+              <li><strong className="text-white">Payment Options:</strong> Payments are processed securely through Razorpay and other authorized payment providers. Fabrication starts only after transaction confirmations are compiled.</li>
             </ul>
           </div>
 
@@ -131,18 +131,15 @@ export default function Terms() {
             <h2 className="text-2xl font-bold text-gold border-b border-border pb-4">
               7. Cancellations, Returns & Refunds
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 gap-4 text-sm">
               <div className="bg-bg/50 p-5 rounded-2xl border border-border space-y-2">
-                <span className="text-amber-400 font-bold block">Cancellation Lock-Ins</span>
-                <p className="text-xs text-muted leading-relaxed">
-                  Standard items can be canceled freely prior to transit. However, custom prints and personalized wood frames cannot be canceled once fabrication begins (design moves past “Design Under Review”).
+                <p className="text-sm text-muted leading-relaxed">
+                  Refunds and cancellations are strictly governed by our separate policies. For detailed rules and instructions on how to cancel an order or claim a refund, please refer to our full policy pages:
                 </p>
-              </div>
-              <div className="bg-bg/50 p-5 rounded-2xl border border-border space-y-2">
-                <span className="text-emerald-400 font-bold block">Damages & Defects</span>
-                <p className="text-xs text-muted leading-relaxed">
-                  Due to their custom tailoring, returns are only accepted for severe transit damages, defects, or incorrect deliveries. Claim requests must be raised within <b>48 hours of delivery</b> alongside photographic evidence.
-                </p>
+                <div className="flex gap-4 pt-2">
+                  <a href="/refunds" className="text-gold hover:underline font-bold">Refund Policy</a>
+                  <a href="/cancellations" className="text-gold hover:underline font-bold">Cancellation Policy</a>
+                </div>
               </div>
             </div>
           </div>
@@ -165,11 +162,22 @@ export default function Terms() {
             </div>
           </div>
 
-          {/* Card 9: Governing Law */}
+          {/* Card 9: Privacy */}
+          <div className="glass p-8 md:p-10 rounded-3xl space-y-4">
+            <h2 className="text-2xl font-bold text-gold flex items-center gap-3 border-b border-border pb-4">
+              <ShieldAlert className="w-6 h-6 text-gold" />
+              9. Privacy
+            </h2>
+            <p className="text-sm text-muted leading-relaxed">
+              Customer information is collected and processed according to our <a href="/privacy" className="text-gold hover:underline font-bold">Privacy Policy</a>.
+            </p>
+          </div>
+
+          {/* Card 10: Governing Law */}
           <div className="glass p-8 md:p-10 rounded-3xl space-y-4">
             <h2 className="text-2xl font-bold text-gold flex items-center gap-3 border-b border-border pb-4">
               <Terminal className="w-6 h-6 text-gold" />
-              9. Governing Law
+              10. Governing Law
             </h2>
             <p className="text-sm text-muted leading-relaxed">
               These Terms and Conditions shall be governed by and interpreted in accordance with the laws of <strong className="text-white">India</strong>. Any disputes arising from these Terms or use of our gift studio shall be subject to the exclusive jurisdiction of the courts located in <strong className="text-white">Bihar, India</strong>.
@@ -177,16 +185,13 @@ export default function Terms() {
           </div>
 
           {/* Contact Section */}
-          <div className="glass p-8 md:p-10 rounded-3xl space-y-4 text-center">
-            <HelpCircle className="w-8 h-8 text-gold mx-auto" />
-            <h3 className="text-2xl font-bold text-gold">Any doubts on our terms?</h3>
-            <p className="text-sm text-muted max-w-xl mx-auto">
-              Please connect directly with our support help desk through email or phone lines for rapid clarification:
-            </p>
-            <div className="p-4 bg-bg/50 rounded-2xl border border-border inline-block text-left text-xs space-y-1.5 font-mono">
-              <p className="text-white">📧 <span className="text-muted">Email:</span> <a href="mailto:Suryafilmsservices@gmail.com" className="hover:text-gold text-white underline">Suryafilmsservices@gmail.com</a></p>
-              <p className="text-white">📞 <span className="text-muted">Phone:</span> +91 79797 12803 / +91 99344 35453</p>
-              <p className="text-white">📍 <span className="text-muted">Registered Address:</span> New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India - 842001</p>
+          <div className="glass p-8 md:p-10 rounded-3xl space-y-6">
+            <h2 className="text-3xl font-bold text-gold border-b border-border pb-4 w-full">11. Contact Information</h2>
+            <div className="space-y-2 text-sm text-white/90">
+              <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur (Surya Films Services)</p>
+              <p>Email: <a href="mailto:Suryafilmsservices@gmail.com" className="text-gold">Suryafilmsservices@gmail.com</a></p>
+              <p>Phone: +91 79797 12803</p>
+              <p>Address: New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India — 842001</p>
             </div>
           </div>
 

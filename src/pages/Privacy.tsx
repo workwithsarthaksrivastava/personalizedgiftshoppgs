@@ -100,16 +100,16 @@ export default function Privacy() {
           {/* Card 4: Payments & Cookies */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="glass p-8 rounded-3xl space-y-4">
-              <h3 className="text-xl font-bold text-gold border-b border-border pb-2">4. Payment Information</h3>
+              <h3 className="text-xl font-bold text-gold border-b border-border pb-2">4. Payment Security</h3>
               <p className="text-sm text-muted leading-relaxed">
-                We do not store complete credit card or debit card numbers on our servers. All transactions are securely routed through certified third-party payment providers (such as Razorpay, secure UPI Gateways, Net Banking, and Card Processors). These processors process your data securely in compliance with standard safety protocols.
+                Payments are processed securely through Razorpay. We do not store credit/debit card details on our servers. All transactions are securely routed through certified payment providers, and these processors handle your data strictly in compliance with standard security protocols.
               </p>
             </div>
             
             <div className="glass p-8 rounded-3xl space-y-4">
               <h3 className="text-xl font-bold text-gold border-b border-border pb-2">5. Cookies & Tracking</h3>
               <p className="text-sm text-muted leading-relaxed">
-                We utilize cookies to elevate website responsiveness, maintain your persistent cart state between browser tabs, and analyze basic traffic. You hold the right to disable web cookies via your native browser preferences, though some interactive mockup studio capabilities may adapt.
+                We utilize cookies to improve user experience, elevate website responsiveness, maintain your persistent cart state between browser tabs, and analyze basic traffic. You hold the right to disable web cookies via your native browser preferences.
               </p>
             </div>
           </div>
@@ -117,11 +117,11 @@ export default function Privacy() {
           {/* Card 5: Information Disclosure & Security */}
           <div className="glass p-8 md:p-10 rounded-3xl space-y-6">
             <h2 className="text-3xl font-bold text-gold border-b border-border pb-4">
-              6. Disclosure, Retention & Security
+              6. Data Sharing & Security
             </h2>
             <div className="space-y-4 text-sm text-muted leading-relaxed">
               <p>
-                <strong className="text-white">Zero Rent or Sale:</strong> Personalized Gift Shop is committed to privacy. We do not sell, swap, or rent individual user details to secondary marketing brokers. Information is only shared with logistics partners (delivery services) or when legally compelled by legal frameworks.
+                <strong className="text-white">Data Sharing:</strong> We do not sell customer information. Information may be shared only with shipping partners and payment processors (such as Razorpay) strictly for order fulfillment.
               </p>
               <p>
                 <strong className="text-white">Robust Data Protection:</strong> We implement practical electronic protections and secure connections to prevent loss, misuse, or alteration. Please do recognize that complete online packet transmission is subject to web factors.
@@ -157,34 +157,13 @@ export default function Privacy() {
           </div>
 
           {/* Contact Section */}
-          <div className="glass p-8 md:p-10 rounded-3xl space-y-6 text-center">
-            <h2 className="text-3xl font-bold text-gold">Any Questions? Contact Us</h2>
-            <p className="text-sm text-muted max-w-xl mx-auto">
-              If you have any doubts about your pictures, custom templates, data processing procedures, or to claim your data removal options, please feel free to reach out to our team:
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 text-left">
-              <div className="flex gap-3 items-center bg-bg/50 p-4 rounded-2xl border border-border">
-                <div className="p-2 bg-gold/10 rounded-xl text-gold shrink-0"><Mail className="w-5 h-5" /></div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-muted tracking-wider">Email Inquiry</p>
-                  <a href="mailto:Suryafilmsservices@gmail.com" className="text-xs font-bold text-white hover:text-gold transition-colors break-all">Suryafilmsservices@gmail.com</a>
-                </div>
-              </div>
-              <div className="flex gap-3 items-center bg-bg/50 p-4 rounded-2xl border border-border">
-                <div className="p-2 bg-gold/10 rounded-xl text-gold shrink-0"><Phone className="w-5 h-5" /></div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-muted tracking-wider">WhatsApp & Support</p>
-                  <p className="text-xs font-bold text-white">+91 79797 12803</p>
-                  <p className="text-xs font-bold text-white">+91 99344 35453</p>
-                </div>
-              </div>
-              <div className="flex gap-3 items-center bg-bg/50 p-4 rounded-2xl border border-border">
-                <div className="p-2 bg-gold/10 rounded-xl text-gold shrink-0"><MapPin className="w-5 h-5" /></div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-muted tracking-wider">Studio Address</p>
-                  <p className="text-xs font-bold text-white leading-tight">New Market, Chowk, near Bihar Jalpan,<br />Shrirampuri, Bhagwanpur, Muzaffarpur,<br />Bihar — 842001</p>
-                </div>
-              </div>
+          <div className="glass p-8 md:p-10 rounded-3xl space-y-6">
+            <h2 className="text-3xl font-bold text-gold border-b border-border pb-4 w-full">8. Contact Information</h2>
+            <div className="space-y-2 text-sm text-white/90">
+              <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur (Surya Films Services)</p>
+              <p>Email: <a href="mailto:Suryafilmsservices@gmail.com" className="text-gold">Suryafilmsservices@gmail.com</a></p>
+              <p>Phone: +91 79797 12803</p>
+              <p>Address: New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India — 842001</p>
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { XCircle, Shield } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 
 export default function Cancellations() {
   return (
@@ -18,59 +18,56 @@ export default function Cancellations() {
         <div className="space-y-8">
           <div className="glass p-8 md:p-10 rounded-3xl space-y-6">
             <p className="text-sm text-muted leading-relaxed">
-              In accordance with standard merchant guidelines and eCommerce regulations, 
-              this Cancellation Policy establishes the rules surrounding the termination of orders placed on Personalized Gift Shop.
+              At <strong className="text-white">Personalized Gift Shop Muzaffarpur</strong>, we understand that customers may need to cancel orders. Our cancellation policy is as follows:
             </p>
 
             <div className="space-y-4">
-              <h3 className="text-xl font-bold text-white">1. Cancellation Window</h3>
+              <h3 className="text-xl font-bold text-white">1. Cancellation Before Production</h3>
               <p className="text-sm text-muted leading-relaxed">
-                Because our products are highly personalized:
+                Orders can be cancelled before the customization, design approval, or production process begins. Eligible cancellations will receive a full refund after deduction of any applicable payment processing charges.
+              </p>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-border mt-6">
+              <h3 className="text-xl font-bold text-white">2. Cancellation After Production Starts</h3>
+              <p className="text-sm text-muted leading-relaxed">
+                Once the customization, printing, or production process has started, the order cannot be cancelled due to the personalized nature of our products.
+              </p>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-border mt-6">
+              <h3 className="text-xl font-bold text-white">3. Shipped Orders</h3>
+              <p className="text-sm text-muted leading-relaxed">
+                Orders that have already been shipped cannot be cancelled. Customers may refer to our <a href="/refunds" className="text-gold hover:underline">Refund Policy</a> for further information.
+              </p>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-border mt-6">
+              <h3 className="text-xl font-bold text-white">4. How to Request a Cancellation</h3>
+              <p className="text-sm text-muted leading-relaxed">
+                To request an order cancellation, please contact us with your order details:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-sm text-white/80">
-                <li>You may request a cancellation <strong className="text-white">only within 2 hours</strong> of placing your order, provided that the designing or printing process has not yet commenced.</li>
-                <li>Once the manufacturing, designing, or print production phase begins, we cannot accept any cancellation requests as the raw materials have already been modified based on your custom requirements.</li>
+                <li><strong className="text-white">Email:</strong> <a href="mailto:Suryafilmsservices@gmail.com" className="text-gold hover:underline">Suryafilmsservices@gmail.com</a></li>
+                <li><strong className="text-white">Phone:</strong> +91 79797 12803</li>
               </ul>
             </div>
 
             <div className="space-y-4 pt-4 border-t border-border mt-6">
-              <h3 className="text-xl font-bold text-white">2. Process for Cancellation</h3>
-              <ul className="list-disc pl-6 space-y-2 text-sm text-white/80">
-                <li>To cancel your order within the eligible window, please urgently contact us via WhatsApp at <strong className="text-gold">+91 79797 12803</strong> or email <strong className="text-gold">Suryafilmsservices@gmail.com</strong>.</li>
-                <li>You must provide your <strong className="text-white">Order ID</strong> and the reason for cancellation.</li>
-                <li>Our support team will verify the order status and confirm if the cancellation is possible.</li>
-              </ul>
+              <h3 className="text-xl font-bold text-white">5. Cancellation Approval</h3>
+              <p className="text-sm text-muted leading-relaxed">
+                Cancellation requests are subject to verification and approval by Personalized Gift Shop Muzaffarpur. We reserve the right to refuse cancellation requests that do not meet the conditions stated in this policy.
+              </p>
             </div>
 
             <div className="space-y-4 pt-4 border-t border-border mt-6">
-              <h3 className="text-xl font-bold text-white">3. Refund for Cancelled Orders</h3>
-              <p className="text-sm text-muted leading-relaxed">
-                If your cancellation request is approved within the acceptable time boundaries:
-              </p>
-              <ul className="list-disc pl-6 space-y-2 text-sm text-white/80">
-                <li>We will immediately cease production and initiate a full reversal of the transaction.</li>
-                <li>The refunded amount will inherently route through the payment aggregator utilized during checkout.</li>
-                <li>Please allow <strong className="text-gold">5 to 7 business days</strong> for the amount to reflect in your original funding source (Bank Account, Credit Card, or Mobile Wallet) according to RBI transaction clearance timelines.</li>
-              </ul>
-            </div>
-
-            <div className="space-y-4 pt-4 border-t border-border mt-6">
-              <h3 className="text-xl font-bold text-white">4. Merchant Initiated Cancellations</h3>
-              <p className="text-sm text-muted leading-relaxed">
-                Personalized Gift Shop reserves the right to cancel an order under specific circumstances, such as:
-              </p>
-              <ul className="list-disc pl-6 space-y-2 text-sm text-white/80">
-                <li>Pricing errors or sudden unavailability of custom raw materials.</li>
-                <li>The uploaded photographs or graphics violate our terms of use (e.g., explicit, illegal, or heavily copyrighted material without permission).</li>
-                <li>If such a cancellation occurs from our end, a <strong className="text-white">100% full refund</strong> will immediately be initiated with a notification delivered to your registered email address or phone number.</li>
-              </ul>
-            </div>
-
-            <div className="space-y-4 pt-4 border-t border-border mt-6">
-              <p className="text-sm text-muted leading-relaxed">
-                This platform is operated by <strong className="text-white">Surya Films Services</strong>.<br/>
-                Registered Address: New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India — 842001
-              </p>
+              <h3 className="text-xl font-bold text-gold border-b border-border pb-2 w-full">6. Contact Information</h3>
+              <div className="space-y-2 text-sm text-white/90 pt-2">
+                <p className="font-bold text-white">Personalized Gift Shop Muzaffarpur (Surya Films Services)</p>
+                <p>Email: <a href="mailto:Suryafilmsservices@gmail.com" className="text-gold hover:underline">Suryafilmsservices@gmail.com</a></p>
+                <p>Phone: +91 79797 12803</p>
+                <p>Address: New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India — 842001</p>
+              </div>
             </div>
 
           </div>

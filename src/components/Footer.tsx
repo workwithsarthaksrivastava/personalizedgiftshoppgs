@@ -70,11 +70,12 @@ export default function Footer() {
 
       <div className="max-w-7xl mx-auto pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted">
         <p>© 2025 Personalized Gift Shop · All Rights Reserved</p>
-        <div className="flex gap-6">
+        <div className="flex gap-4 md:gap-6 flex-wrap justify-center">
           <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-          <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+          <Link to="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link>
           <Link to="/refunds" className="hover:text-white transition-colors">Refund Policy</Link>
           <Link to="/cancellations" className="hover:text-white transition-colors">Cancellation Policy</Link>
+          <Link to="/contact" className="hover:text-white transition-colors">Contact Us</Link>
         </div>
       </div>
 
