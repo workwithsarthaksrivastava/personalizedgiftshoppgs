@@ -17,7 +17,7 @@ export default function Privacy() {
             Last Updated: June 10, 2026
           </p>
           <p className="text-muted max-w-2xl mx-auto mt-2">
-            Welcome to <span className="text-white font-medium">Personalized Gift Shop</span>. This Privacy Policy explains how we collect, use, disclose, and protect your information when you visit <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and use our services.
+            Welcome to <span className="text-white font-medium">Personalized Gift Shop</span> (operated under the legal entity <span className="text-gold font-medium">Surya Films Services</span>). This Privacy Policy explains how we collect, use, disclose, and protect your information when you visit <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and use our services.
           </p>
         </div>
 
@@ -182,7 +182,7 @@ export default function Privacy() {
                 <div className="p-2 bg-gold/10 rounded-xl text-gold shrink-0"><MapPin className="w-5 h-5" /></div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-muted tracking-wider">Studio Address</p>
-                  <p className="text-xs font-bold text-white leading-tight">Bhagwanpur, Muzaffarpur, Bihar</p>
+                  <p className="text-xs font-bold text-white leading-tight">New Market, Chowk, near Bihar Jalpan,<br />Shrirampuri, Bhagwanpur, Muzaffarpur,<br />Bihar — 842001</p>
                 </div>
               </div>
             </div>

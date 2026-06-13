@@ -184,6 +184,8 @@ export default function Checkout() {
         toast.success('Order placed successfully!');
         setLoading(false);
       } else if (paymentMethod === 'online') {
+        const keyId = (import.meta as any).env.VITE_RAZORPAY_KEY_ID;
+        console.log("VITE_RAZORPAY_KEY_ID is:", keyId);
         // Create Razorpay Order with final total
         const res = await fetch('/api/create-razorpay-order', {
           method: 'POST',
@@ -193,11 +195,11 @@ export default function Checkout() {
         const data = await res.json();
 
         if (!data.success) {
-          throw new Error('Failed to initiate payment');
+          throw new Error(data.message || 'Failed to initiate payment');
         }
 
         const options = {
-          key: (import.meta as any).env.VITE_RAZORPAY_KEY_ID, // Use Razorpay Key ID
+          key: data.key, // Use Razorpay Key ID returned from backend
           amount: data.amount,
           currency: data.currency,
           name: "Photo Genic Studio",

@@ -1,6 +1,8 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import * as dotenv from "dotenv";
+dotenv.config({ override: true });
 import { createServer as createViteServer } from "vite";
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -196,28 +198,51 @@ async function startServer() {
     next();
   });
 
+  app.get("/api/test-env", (req, res) => {
+    res.json({
+      id: process.env.RAZORPAY_KEY_ID,
+      secret: process.env.RAZORPAY_KEY_SECRET ? "exists (length " + process.env.RAZORPAY_KEY_SECRET.length + ")" : "undefined"
+    });
+  });
+
   // Razorpay order creation endpoint
   app.post("/api/create-razorpay-order", async (req, res) => {
     try {
       const { amount, currency = "INR", receipt } = req.body;
 
+      console.log("Rzp Keys in server:", process.env.RAZORPAY_KEY_ID, process.env.RAZORPAY_KEY_SECRET);
       if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        throw new Error("Razorpay API keys are not configured in environment variables.");
+        return res.status(500).json({ success: false, message: "Razorpay API keys are not configured in environment variables." });
       }
 
-      const instance = new Razorpay({
+      if (process.env.RAZORPAY_KEY_ID === "rzp_test_dummy") {
+        return res.status(500).json({ success: false, message: "Using dummy keys!" });
+      }
+
+      const amountInPaise = Math.round(amount * 100);
+      if (amountInPaise < 100) {
+        return res.status(400).json({ success: false, message: "Amount must be at least 100 paise" });
+      }
+
+      console.log("Creating Razorpay order with:", {
+        amountInPaise, currency, receipt,
         key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
+        key_secret: process.env.RAZORPAY_KEY_SECRET ? `***${process.env.RAZORPAY_KEY_SECRET.slice(-4)}` : "missing"
+      });
+
+      const instance = new Razorpay({
+        key_id: String(process.env.RAZORPAY_KEY_ID).trim(),
+        key_secret: String(process.env.RAZORPAY_KEY_SECRET).trim(),
       });
 
       const options = {
-        amount: Math.round(amount * 100), // amount in smallest currency unit (paisa)
+        amount: amountInPaise, // amount in smallest currency unit (paisa)
         currency,
         receipt,
       };
 
       const order = await instance.orders.create(options);
-      
+
       if (!order) {
         return res.status(500).json({ success: false, message: "Order creation failed" });
       }
@@ -226,12 +251,17 @@ async function startServer() {
         success: true,
         orderId: order.id,
         amount: order.amount,
-        currency: order.currency
+        currency: order.currency,
+        key: process.env.RAZORPAY_KEY_ID,
+        isMock: (order as any).isMock || false
       });
 
     } catch (error: any) {
       console.error("Razorpay error:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to create order" });
+      if (error.statusCode === 401) {
+        return res.status(401).json({ success: false, message: "Razorpay Authentication failed", details: error });
+      }
+      res.status(500).json({ success: false, message: error.message || "Failed to create order", details: error });
     }
   });
 
@@ -240,6 +270,10 @@ async function startServer() {
     try {
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
       
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return res.status(400).json({ success: false, message: "Missing required fields" });
+      }
+
       const key_secret = process.env.RAZORPAY_KEY_SECRET;
       
       if (!key_secret) {
@@ -252,8 +286,10 @@ async function startServer() {
         .createHmac("sha256", key_secret)
         .update(body.toString())
         .digest("hex");
+      
+      const isValid = (expectedSignature === razorpay_signature);
 
-      if (expectedSignature === razorpay_signature) {
+      if (isValid) {
         // Here you would usually mark the order as paid in database if server-side only
         res.status(200).json({ success: true, message: "Payment verified successfully" });
       } else {

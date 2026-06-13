@@ -17,7 +17,7 @@ export default function Terms() {
             Last Updated: June 10, 2026
           </p>
           <p className="text-muted max-w-2xl mx-auto mt-3 text-sm leading-relaxed">
-            Welcome to <span className="text-white font-semibold">Personalized Gift Shop</span> ("Company", "we", "our", or "us"). These Terms and Conditions govern your access to and use of <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and the products and services offered through our website.
+            Welcome to <span className="text-white font-semibold">Personalized Gift Shop</span> (operated under the registered legal entity <span className="text-gold font-medium">Surya Films Services</span>, hereafter referred to as "Company", "we", "our", or "us"). These Terms and Conditions govern your access to and use of <span className="text-gold font-medium">personalizedgiftshoppgs.vercel.app</span> and the products and services offered through our website.
           </p>
         </div>
 
@@ -186,7 +186,7 @@ export default function Terms() {
             <div className="p-4 bg-bg/50 rounded-2xl border border-border inline-block text-left text-xs space-y-1.5 font-mono">
               <p className="text-white">📧 <span className="text-muted">Email:</span> <a href="mailto:Suryafilmsservices@gmail.com" className="hover:text-gold text-white underline">Suryafilmsservices@gmail.com</a></p>
               <p className="text-white">📞 <span className="text-muted">Phone:</span> +91 79797 12803 / +91 99344 35453</p>
-              <p className="text-white">📍 <span className="text-muted">Address:</span> Bhagwanpur, Muzaffarpur, Bihar, India - 842001</p>
+              <p className="text-white">📍 <span className="text-muted">Registered Address:</span> New Market, Chowk, near Bihar Jalpan, Shrirampuri, Bhagwanpur, Muzaffarpur, Bihar, India - 842001</p>
             </div>
           </div>
 

@@ -22,6 +22,8 @@ const Wishlist = lazy(() => import('./pages/Wishlist'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const Terms = lazy(() => import('./pages/Terms'));
+const Refunds = lazy(() => import('./pages/Refunds'));
+const Cancellations = lazy(() => import('./pages/Cancellations'));
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center bg-bg">
@@ -54,6 +56,8 @@ export default function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/refunds" element={<Refunds />} />
+              <Route path="/cancellations" element={<Cancellations />} />
             </Routes>
           </Suspense>
         </main>
