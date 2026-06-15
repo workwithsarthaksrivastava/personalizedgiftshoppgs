@@ -184,8 +184,6 @@ export default function Checkout() {
         toast.success('Order placed successfully!');
         setLoading(false);
       } else if (paymentMethod === 'online') {
-        const keyId = (import.meta as any).env.VITE_RAZORPAY_KEY_ID;
-        console.log("VITE_RAZORPAY_KEY_ID is:", keyId);
         // Create Razorpay Order with final total
         const res = await fetch('/api/create-razorpay-order', {
           method: 'POST',

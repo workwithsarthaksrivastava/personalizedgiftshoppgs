@@ -9,14 +9,24 @@ import crypto from "crypto";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+let ai: GoogleGenAI | null = null;
+const getAiClient = () => {
+  if (!ai) {
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn("GEMINI_API_KEY is missing. AI Recommendation fallback will be used.");
+      return null;
     }
+    ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
-});
+  return ai;
+};
 
 
 async function startServer() {
@@ -369,7 +379,9 @@ Analyze which top 3 candidate products would go exceptionally well together as a
 Return a list of up to 3 candidate IDs and a delightful, highly specific styling tip of exactly why these recommended products complement the current item.
 Always be friendly, encouraging, and specific to the actual items (e.g., matching photo frames with UV prints, sublimation gifts with custom lamps). Keep the tip under 80 words.`;
 
-      const response = await ai.models.generateContent({
+      const aiClient = getAiClient();
+      if (!aiClient) throw new Error("AI not configured");
+      const response = await aiClient.models.generateContent({
         model: "gemini-3.5-flash",
         contents: prompt,
         config: {
@@ -465,7 +477,9 @@ Extract the structured search criteria from the user's natural language input.
 - inStockOnly: True if they specifically mention in stock, available, instock, ready, now. False otherwise.
 - aiInsight: A tiny, ultra-polite stylist insight (max 12 words) reacting to their search constraint cheerfully (e.g., "A perfect choice! Acrylic prints look stunning under warm room lights." or "These matching frames make for beautiful custom table accents."). Make it friendly and specific.`;
 
-      const response = await ai.models.generateContent({
+      const aiClient = getAiClient();
+      if (!aiClient) throw new Error("AI not configured");
+      const response = await aiClient.models.generateContent({
         model: "gemini-3.5-flash",
         contents: prompt,
         config: {
