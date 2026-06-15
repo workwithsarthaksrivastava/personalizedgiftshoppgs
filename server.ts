@@ -215,6 +215,17 @@ async function startServer() {
     });
   });
 
+  app.get("/api/slideshow-images", (req, res) => {
+    res.json({
+      images: [
+        "/shop_slideshow_1.png",
+        "/shop_slideshow_2.png",
+        "/shop_slideshow_3.png",
+        "/shop_slideshow_4.png",
+      ]
+    });
+  });
+
   // Razorpay order creation endpoint
   app.post("/api/create-razorpay-order", async (req, res) => {
     try {

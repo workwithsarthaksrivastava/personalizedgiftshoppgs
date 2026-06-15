@@ -38,6 +38,20 @@ export default function Checkout() {
     customRoleText: '',
   });
 
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      const existingScript = document.getElementById('razorpay-checkout-js');
+      if (existingScript) return resolve(true);
+      
+      const script = document.createElement('script');
+      script.id = 'razorpay-checkout-js';
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -45,18 +59,6 @@ export default function Checkout() {
         setFormData(prev => ({ ...prev, email: session.user.email || '' }));
       }
     });
-
-    // Dynamically load Razorpay script
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -184,6 +186,13 @@ export default function Checkout() {
         toast.success('Order placed successfully!');
         setLoading(false);
       } else if (paymentMethod === 'online') {
+        const isLoaded = await loadRazorpay();
+        if (!isLoaded) {
+          toast.error('Payment gateway failed to load. Please disable ad blockers and try again.');
+          setLoading(false);
+          return;
+        }
+
         // Create Razorpay Order with final total
         const res = await fetch('/api/create-razorpay-order', {
           method: 'POST',
