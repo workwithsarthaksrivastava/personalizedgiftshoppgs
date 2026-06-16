@@ -31,7 +31,7 @@ export default function Checkout() {
     email: '',
     address: '',
     city: '',
-    state: '',
+    state: 'Bihar',
     pinCode: '',
     deliveryInstructions: '',
     customerRole: 'Customer',
@@ -352,8 +352,18 @@ export default function Checkout() {
                 <textarea name="deliveryInstructions" value={formData.deliveryInstructions} onChange={handleInputChange} rows={2} className="w-full bg-bg border border-border rounded-xl px-4 py-3 outline-none focus:border-gold resize-none" placeholder="E.g., Leave at the front door, Call before delivery..." />
               </div>
               <button 
-                onClick={() => setStep(2)}
-                className="md:col-span-2 mt-4 py-4 gold-gradient text-bg font-bold rounded-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                onClick={() => {
+                  if (!formData.fullName || !formData.phone || !formData.email || !formData.address || !formData.city || !formData.pinCode) {
+                    toast.error('Please fill in all shipping details');
+                    return;
+                  }
+                  if (!/^(8[0-5])\d{4}$/.test(formData.pinCode.trim())) {
+                    toast.error('Dear customer, we currently deliver within Bihar only.');
+                    return;
+                  }
+                  setStep(2);
+                }}
+                className="md:col-span-2 mt-4 py-4 gold-gradient text-bg font-bold rounded-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 cursor-pointer"
               >
                 Continue to Payment <ArrowRight className="w-5 h-5" />
               </button>

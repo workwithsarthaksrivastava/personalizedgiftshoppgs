@@ -33,6 +33,7 @@ import { supabase } from '../supabase';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import AdminSlideshows from './AdminSlideshows';
+import AdminCustomers from './AdminCustomers';
 
 const ImageAreaSelector = ({ image, area, onChange }: any) => {
   const [mode, setMode] = useState(area?.type || 'rect');
@@ -2457,7 +2458,7 @@ export default function Admin() {
           <Route path="subsections" element={<SubsectionsManagement />} />
           <Route path="frames" element={<FramesManagement />} />
           <Route path="orders" element={<OrdersManagement />} />
-          <Route path="customers" element={<div className="text-muted">Customers List (Coming Soon)</div>} />
+          <Route path="customers" element={<AdminCustomers />} />
           <Route path="slideshows" element={<AdminSlideshows />} />
           <Route path="settings" element={<div className="text-muted">Settings (Coming Soon)</div>} />
         </Routes>
