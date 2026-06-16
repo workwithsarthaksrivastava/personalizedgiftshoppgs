@@ -290,7 +290,7 @@ export default function Home() {
 
       <section className="px-6 py-12">
         <div className="max-w-7xl mx-auto">
-          <Slideshow />
+          <Slideshow category="_SLIDESHOW_HOME_2_" />
         </div>
       </section>
 

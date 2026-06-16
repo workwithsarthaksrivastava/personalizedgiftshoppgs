@@ -10,7 +10,8 @@ export default function SlideshowsManagement() {
   const [newSlideCategory, setNewSlideCategory] = useState('_SLIDESHOW_HOME_');
 
   const categories = [
-    { id: '_SLIDESHOW_HOME_', name: 'Homepage' },
+    { id: '_SLIDESHOW_HOME_', name: 'Homepage (Slideshow 1 - Desktop Background)' },
+    { id: '_SLIDESHOW_HOME_2_', name: 'Homepage (Slideshow 2 - Below Hero)' },
     { id: '_SLIDESHOW_UV_', name: 'Products - UV Printing' },
     { id: '_SLIDESHOW_ALBUM_', name: 'Products - Album Printing' },
     { id: '_SLIDESHOW_FRAME_', name: 'Products - Frame Printing' },
