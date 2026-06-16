@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { supabase } from '../supabase';
 
 const defaultImages = [
   '/welcome.png',
@@ -8,26 +9,28 @@ const defaultImages = [
   '/wholesale.png',
 ];
 
-export default function Slideshow() {
+export default function Slideshow({ category = '_SLIDESHOW_HOME_', className = "aspect-[21/9] md:aspect-[3/1]" }: { category?: string, className?: string }) {
   const [images, setImages] = useState<string[]>(defaultImages);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const res = await fetch('/api/slideshow-images');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.images && data.images.length > 0) {
-            setImages(data.images);
-          }
+        const { data, error } = await supabase
+          .from('products')
+          .select('image')
+          .eq('category', category)
+          .order('created_at', { ascending: false });
+        
+        if (!error && data && data.length > 0) {
+          setImages(data.map(d => d.image));
         }
       } catch (err) {
         console.error('Error fetching dynamic slideshow:', err);
       }
     };
     fetchSlides();
-  }, []);
+  }, [category]);
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -43,7 +46,7 @@ export default function Slideshow() {
   if (images.length === 0) return null;
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl aspect-[21/9] md:aspect-[3/1] bg-surface">
+    <div className={`relative w-full overflow-hidden rounded-2xl bg-surface ${className}`}>
       <AnimatePresence mode="wait">
         <motion.img
           key={index}

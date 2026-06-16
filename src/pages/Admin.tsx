@@ -26,11 +26,13 @@ import {
   Layers,
   Search,
   Filter,
-  Download
+  Download,
+  Image as ImageIcon
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
+import AdminSlideshows from './AdminSlideshows';
 
 const ImageAreaSelector = ({ image, area, onChange }: any) => {
   const [mode, setMode] = useState(area?.type || 'rect');
@@ -524,9 +526,9 @@ const ProductsManagement = () => {
     if ((supabase as any).supabaseUrl.includes('placeholder')) return;
     const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
     if (data) {
-      setProducts(data.filter((p: any) => p.category !== '_SUBSECTION_'));
+      setProducts(data.filter((p: any) => p.category !== '_SUBSECTION_' && !p.category.startsWith('_SLIDESHOW_')));
       setSubsections(data.filter((p: any) => p.category === '_SUBSECTION_'));
-      const mainProds = data.filter((p: any) => p.category !== '_SUBSECTION_');
+      const mainProds = data.filter((p: any) => p.category !== '_SUBSECTION_' && !p.category.startsWith('_SLIDESHOW_'));
       const uniqueCats = Array.from(new Set(mainProds.map((p: any) => p.category))).filter(Boolean);
       const allCats = Array.from(new Set(['Album Printing', 'Photo Frames', 'UV Printing', 'Sublimation Gifts', ...uniqueCats]));
       setCategories(allCats as string[]);
@@ -2390,6 +2392,7 @@ export default function Admin() {
     { name: 'Frame Studio', path: '/admin/frames', icon: <FrameIcon className="w-5 h-5" /> },
     { name: 'Orders', path: '/admin/orders', icon: <ShoppingCart className="w-5 h-5" /> },
     { name: 'Customers', path: '/admin/customers', icon: <Users className="w-5 h-5" /> },
+    { name: 'Slideshows', path: '/admin/slideshows', icon: <ImageIcon className="w-5 h-5" /> },
     { name: 'Settings', path: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
   ];
 
@@ -2455,6 +2458,7 @@ export default function Admin() {
           <Route path="frames" element={<FramesManagement />} />
           <Route path="orders" element={<OrdersManagement />} />
           <Route path="customers" element={<div className="text-muted">Customers List (Coming Soon)</div>} />
+          <Route path="slideshows" element={<AdminSlideshows />} />
           <Route path="settings" element={<div className="text-muted">Settings (Coming Soon)</div>} />
         </Routes>
       </main>

@@ -18,6 +18,18 @@ export default function Home() {
   const [bgIndex, setBgIndex] = useState(0);
 
   useEffect(() => {
+    const fetchHomeSlides = async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('image')
+        .eq('category', '_SLIDESHOW_HOME_')
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        setBgImages(data.map(d => d.image));
+      }
+    };
+    fetchHomeSlides();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setUser(session.user);
@@ -130,7 +142,7 @@ export default function Home() {
         ];
       }
 
-      const mainProducts = allProducts.filter((p: any) => p.category !== '_SUBSECTION_');
+      const mainProducts = allProducts.filter((p: any) => p.category !== '_SUBSECTION_' && !p.category.startsWith('_SLIDESHOW_'));
 
       if (searches.length > 0) {
         const matched: any[] = [];

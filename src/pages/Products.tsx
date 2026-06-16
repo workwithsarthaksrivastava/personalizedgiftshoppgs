@@ -7,6 +7,7 @@ import { supabase } from '../supabase';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import html2canvas from 'html2canvas';
+import Slideshow from '../components/Slideshow';
 
 // Module-level cache for instant SWR page transitions
 let cachedProducts: any[] | null = null;
@@ -44,62 +45,6 @@ export default function Products() {
     }
   }, [location.hash, location.search, categories]);
   
-  const [uvIndex, setUvIndex] = useState(0);
-  const uvSlides = ['/uv_slide_1.png', '/uv_slide_2.png'];
-
-  useEffect(() => {
-    if (activeCategory !== 'UV Printing') return;
-    const interval = setInterval(() => {
-      setUvIndex((prev) => (prev + 1) % uvSlides.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [activeCategory, uvSlides.length]);
-
-  const nextUvSlide = () => setUvIndex((prev) => (prev + 1) % uvSlides.length);
-  const prevUvSlide = () => setUvIndex((prev) => (prev - 1 + uvSlides.length) % uvSlides.length);
-
-  const [albumIndex, setAlbumIndex] = useState(0);
-  const albumSlides = ['/album_slide_1.png', '/album_slide_2.png'];
-
-  useEffect(() => {
-    if (activeCategory !== 'Album Printing') return;
-    const interval = setInterval(() => {
-      setAlbumIndex((prev) => (prev + 1) % albumSlides.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [activeCategory, albumSlides.length]);
-
-  const nextAlbumSlide = () => setAlbumIndex((prev) => (prev + 1) % albumSlides.length);
-  const prevAlbumSlide = () => setAlbumIndex((prev) => (prev - 1 + albumSlides.length) % albumSlides.length);
-
-  const [frameIndex, setFrameIndex] = useState(0);
-  const frameSlides = ['/frame_slide_1.png', '/frame_slide_2.png'];
-
-  useEffect(() => {
-    if (activeCategory !== 'Photo Frames') return;
-    const interval = setInterval(() => {
-      setFrameIndex((prev) => (prev + 1) % frameSlides.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [activeCategory, frameSlides.length]);
-
-  const nextFrameSlide = () => setFrameIndex((prev) => (prev + 1) % frameSlides.length);
-  const prevFrameSlide = () => setFrameIndex((prev) => (prev - 1 + frameSlides.length) % frameSlides.length);
-
-  const [sublimationIndex, setSublimationIndex] = useState(0);
-  const sublimationSlides = ['/sublimation_slide_1.png', '/sublimation_slide_2.png'];
-
-  useEffect(() => {
-    if (activeCategory !== 'Sublimation Gifts') return;
-    const interval = setInterval(() => {
-      setSublimationIndex((prev) => (prev + 1) % sublimationSlides.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [activeCategory, sublimationSlides.length]);
-
-  const nextSublimationSlide = () => setSublimationIndex((prev) => (prev + 1) % sublimationSlides.length);
-  const prevSublimationSlide = () => setSublimationIndex((prev) => (prev - 1 + sublimationSlides.length) % sublimationSlides.length);
-
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isTryOnOpen, setIsTryOnOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -494,7 +439,7 @@ export default function Products() {
         if (data && data.length > 0) {
           setProducts(data);
           cachedProducts = data;
-          const mainProds = data.filter((p: any) => p.category !== '_SUBSECTION_');
+          const mainProds = data.filter((p: any) => p.category !== '_SUBSECTION_' && !p.category.startsWith('_SLIDESHOW_'));
           const uniqueCats = Array.from(new Set(mainProds.map((p: any) => p.category))).filter(Boolean);
           const allCats = Array.from(new Set(['Album Printing', 'Photo Frames', 'UV Printing', 'Sublimation Gifts', ...uniqueCats]));
           const computedCats = ['All', ...allCats] as string[];
@@ -538,15 +483,15 @@ export default function Products() {
     } catch { return null; }
   };
 
-  const mainProducts = products.filter(p => p.category !== '_SUBSECTION_' && (activeCategory === 'All' || p.category === activeCategory));
+  const mainProducts = products.filter(p => p.category !== '_SUBSECTION_' && !p.category.startsWith('_SLIDESHOW_') && (activeCategory === 'All' || p.category === activeCategory));
   const subsections = activeCategory === 'All'
     ? []
     : products.filter(p => p.category === '_SUBSECTION_').filter(s => parseParent(s.description) === activeCategory);
   
   // Master Advanced filtering pipeline
   const displayedProducts = products.filter((p) => {
-    // 1. Exclude subsections
-    if (p.category === '_SUBSECTION_') return false;
+    // 1. Exclude subsections and slideshows
+    if (p.category === '_SUBSECTION_' || p.category.startsWith('_SLIDESHOW_')) return false;
 
     // 2. Category Filter (skip if 'All')
     if (activeCategory !== 'All' && p.category !== activeCategory) {
@@ -616,7 +561,7 @@ export default function Products() {
   }).slice(0, 4);
 
   const suggestedProducts = products.filter((p) => {
-    if (p.category === '_SUBSECTION_') return false;
+    if (p.category === '_SUBSECTION_' || p.category.startsWith('_SLIDESHOW_')) return false;
     const q = searchQuery.toLowerCase();
     const nameMatch = (p.name || '').toLowerCase().includes(q);
     const descMatch = (p.description || '').toLowerCase().includes(q);
@@ -1076,223 +1021,28 @@ export default function Products() {
           </AnimatePresence>
         </div>
 
-        {/* UV Printing Slideshow Section */}
+        {/* Dynamic Slideshow Sections based on active category */}
         {activeCategory === 'UV Printing' && (
-          <div className="mb-12 max-w-5xl mx-auto" id="uv-category-slideshow-container">
-            <div className="relative group overflow-hidden rounded-3xl border border-white/10 bg-black/45 shadow-2xl w-full aspect-[16/9] flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={uvIndex}
-                  src={uvSlides[uvIndex]}
-                  initial={{ opacity: 0, scale: 1.01 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.99 }}
-                  transition={{ duration: 0.4, ease: "easeInOut" }}
-                  referrerPolicy="no-referrer"
-                  className="absolute inset-0 w-full h-full object-cover select-none rounded-3xl"
-                  alt={`Muzaffarpur Premium UV Printing Slide ${uvIndex + 1}`}
-                />
-              </AnimatePresence>
-
-              {/* Navigation Arrows */}
-              <button
-                onClick={prevUvSlide}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Previous Slide"
-              >
-                <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-              <button
-                onClick={nextUvSlide}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Next Slide"
-              >
-                <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-
-              {/* Indicator dots inside the banner */}
-              <div className="absolute bottom-4 right-4 md:bottom-6 md:right-8 flex gap-1.5 z-20 bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-full border border-white/10">
-                {uvSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setUvIndex(idx)}
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full transition-all duration-300 cursor-pointer",
-                      uvIndex === idx ? "bg-gold w-4" : "bg-white/30 hover:bg-white/50"
-                    )}
-                    type="button"
-                    aria-label={`Go to slide ${idx + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
+          <div className="mb-12 max-w-5xl mx-auto">
+            <Slideshow category="_SLIDESHOW_UV_" className="aspect-[16/9]" />
           </div>
         )}
 
-        {/* Album Printing Slideshow Section */}
         {activeCategory === 'Album Printing' && (
-          <div className="mb-12 max-w-5xl mx-auto" id="album-category-slideshow-container">
-            <div className="relative group overflow-hidden rounded-3xl border border-white/10 bg-black/45 shadow-2xl w-full aspect-[16/9] flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={albumIndex}
-                  src={albumSlides[albumIndex]}
-                  initial={{ opacity: 0, scale: 1.01 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.99 }}
-                  transition={{ duration: 0.4, ease: "easeInOut" }}
-                  referrerPolicy="no-referrer"
-                  className="absolute inset-0 w-full h-full object-cover select-none rounded-3xl"
-                  alt={`Premium Album Printing Slide ${albumIndex + 1}`}
-                />
-              </AnimatePresence>
-
-              {/* Navigation Arrows */}
-              <button
-                onClick={prevAlbumSlide}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Previous Slide"
-              >
-                <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-              <button
-                onClick={nextAlbumSlide}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Next Slide"
-              >
-                <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-
-              {/* Indicator dots inside the banner */}
-              <div className="absolute bottom-4 right-4 md:bottom-6 md:right-8 flex gap-1.5 z-20 bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-full border border-white/10">
-                {albumSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setAlbumIndex(idx)}
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full transition-all duration-300 cursor-pointer",
-                      albumIndex === idx ? "bg-gold w-4" : "bg-white/30 hover:bg-white/50"
-                    )}
-                    type="button"
-                    aria-label={`Go to slide ${idx + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
+          <div className="mb-12 max-w-5xl mx-auto">
+            <Slideshow category="_SLIDESHOW_ALBUM_" className="aspect-[16/9]" />
           </div>
         )}
 
-        {/* Photo Frames Slideshow Section */}
         {activeCategory === 'Photo Frames' && (
-          <div className="mb-12 max-w-5xl mx-auto" id="frame-category-slideshow-container">
-            <div className="relative group overflow-hidden rounded-3xl border border-white/10 bg-black/45 shadow-2xl w-full aspect-[16/9] flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={frameIndex}
-                  src={frameSlides[frameIndex]}
-                  initial={{ opacity: 0, scale: 1.01 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.99 }}
-                  transition={{ duration: 0.4, ease: "easeInOut" }}
-                  referrerPolicy="no-referrer"
-                  className="absolute inset-0 w-full h-full object-cover select-none rounded-3xl"
-                  alt={`Premium Photo Frames Slide ${frameIndex + 1}`}
-                />
-              </AnimatePresence>
-
-              {/* Navigation Arrows */}
-              <button
-                onClick={prevFrameSlide}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Previous Slide"
-              >
-                <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-              <button
-                onClick={nextFrameSlide}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Next Slide"
-              >
-                <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-
-              {/* Indicator dots inside the banner */}
-              <div className="absolute bottom-4 right-4 md:bottom-6 md:right-8 flex gap-1.5 z-20 bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-full border border-white/10">
-                {frameSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setFrameIndex(idx)}
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full transition-all duration-300 cursor-pointer",
-                      frameIndex === idx ? "bg-gold w-4" : "bg-white/30 hover:bg-white/50"
-                    )}
-                    type="button"
-                    aria-label={`Go to slide ${idx + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
+          <div className="mb-12 max-w-5xl mx-auto">
+            <Slideshow category="_SLIDESHOW_FRAME_" className="aspect-[16/9]" />
           </div>
         )}
 
-        {/* Sublimation Gifts Slideshow Section */}
         {activeCategory === 'Sublimation Gifts' && (
-          <div className="mb-12 max-w-5xl mx-auto" id="sublimation-category-slideshow-container">
-            <div className="relative group overflow-hidden rounded-3xl border border-white/10 bg-black/45 shadow-2xl w-full aspect-[16/9] flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={sublimationIndex}
-                  src={sublimationSlides[sublimationIndex]}
-                  initial={{ opacity: 0, scale: 1.01 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.99 }}
-                  transition={{ duration: 0.4, ease: "easeInOut" }}
-                  referrerPolicy="no-referrer"
-                  className="absolute inset-0 w-full h-full object-cover select-none rounded-3xl"
-                  alt={`Premium Sublimation Gifts Slide ${sublimationIndex + 1}`}
-                />
-              </AnimatePresence>
-
-              {/* Navigation Arrows */}
-              <button
-                onClick={prevSublimationSlide}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Previous Slide"
-              >
-                <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-              <button
-                onClick={nextSublimationSlide}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center border border-white/10 z-20 cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                type="button"
-                aria-label="Next Slide"
-              >
-                <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
-              </button>
-
-              {/* Indicator dots inside the banner */}
-              <div className="absolute bottom-4 right-4 md:bottom-6 md:right-8 flex gap-1.5 z-20 bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-full border border-white/10">
-                {sublimationSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSublimationIndex(idx)}
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full transition-all duration-300 cursor-pointer",
-                      sublimationIndex === idx ? "bg-gold w-4" : "bg-white/30 hover:bg-white/50"
-                    )}
-                    type="button"
-                    aria-label={`Go to slide ${idx + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
+          <div className="mb-12 max-w-5xl mx-auto">
+            <Slideshow category="_SLIDESHOW_SUBLIMATION_" className="aspect-[16/9]" />
           </div>
         )}
 
