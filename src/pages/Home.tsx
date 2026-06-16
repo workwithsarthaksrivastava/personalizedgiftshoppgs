@@ -16,16 +16,34 @@ export default function Home() {
     '/shop_slideshow_4.png'
   ]);
   const [bgIndex, setBgIndex] = useState(0);
+  const [exploreImages, setExploreImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchHomeSlides = async () => {
       const { data, error } = await supabase
         .from('products')
-        .select('image')
-        .eq('category', '_SLIDESHOW_HOME_')
+        .select('*')
+        .ilike('category', '%_SLIDESHOW_%')
         .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setBgImages(data.map(d => d.image));
+        
+      if (!error && data) {
+        const homeSlides = data.filter(d => d.category === '_SLIDESHOW_HOME_');
+        if (homeSlides.length > 0) setBgImages(homeSlides.map(d => d.image_url || d.image));
+
+        const exploreMap: Record<string, string> = {};
+        const albumSlides = data.filter(d => d.category === '_SLIDESHOW_EXPLORE_ALBUM_');
+        if (albumSlides.length > 0) exploreMap['Album Printing'] = albumSlides[0].image_url || albumSlides[0].image;
+
+        const frameSlides = data.filter(d => d.category === '_SLIDESHOW_EXPLORE_FRAME_');
+        if (frameSlides.length > 0) exploreMap['Photo Frames'] = frameSlides[0].image_url || frameSlides[0].image;
+
+        const uvSlides = data.filter(d => d.category === '_SLIDESHOW_EXPLORE_UV_');
+        if (uvSlides.length > 0) exploreMap['UV Printing'] = uvSlides[0].image_url || uvSlides[0].image;
+
+        const subSlides = data.filter(d => d.category === '_SLIDESHOW_EXPLORE_SUB_');
+        if (subSlides.length > 0) exploreMap['Sublimation Gifts'] = subSlides[0].image_url || subSlides[0].image;
+
+        setExploreImages(exploreMap);
       }
     };
     fetchHomeSlides();
@@ -88,28 +106,28 @@ export default function Home() {
     {
       name: "Album Printing",
       desc: "Premium double layflat professional photo albums to preserve memories.",
-      image: "/album_slide_1.png",
+      image: exploreImages["Album Printing"] || "/album_slide_1.png",
       hash: "#album-printing",
       color: "from-blue-600/25 to-indigo-900/40"
     },
     {
       name: "Photo Frames",
       desc: "Acrylic, LED, and wooden frames crafted to blend with your beautiful spaces.",
-      image: "/frame_slide_1.png",
+      image: exploreImages["Photo Frames"] || "/frame_slide_1.png",
       hash: "#photo-frames",
       color: "from-amber-600/25 to-yellow-900/40"
     },
     {
       name: "UV Printing",
       desc: "Vibrant, scratch-proof premium prints direct on crystal glass, acrylic, and wood.",
-      image: "/uv_slide_1.png",
+      image: exploreImages["UV Printing"] || "/uv_slide_1.png",
       hash: "#uv-printing",
       color: "from-purple-600/25 to-fuchsia-900/40"
     },
     {
       name: "Sublimation Gifts",
       desc: "Personalized corporate merchandise, beautiful magic mugs, cushion gifts.",
-      image: "/sublimation_slide_1.png",
+      image: exploreImages["Sublimation Gifts"] || "/sublimation_slide_1.png",
       hash: "#sublimation-gifts",
       color: "from-pink-600/25 to-red-900/40"
     }
@@ -484,59 +502,6 @@ export default function Home() {
                 <p className="text-muted text-sm">{feature.desc}</p>
               </motion.div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Highlight Section */}
-      <section className="py-24 px-6 bg-surface">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gold mb-4">Premium Pricing</h2>
-            <p className="text-muted">Best quality at competitive rates</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="glass p-8 rounded-2xl">
-              <h3 className="text-2xl font-bold text-gold mb-6 border-b border-border pb-4">Acrylic Photo Frames</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="text-muted border-b border-border">
-                      <th className="pb-4">Size</th>
-                      <th className="pb-4">2MM</th>
-                      <th className="pb-4">3MM</th>
-                      <th className="pb-4">5MM</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-white/80">
-                    <tr className="border-b border-border/50"><td className="py-4">8×12</td><td>₹525</td><td>₹700</td><td>₹1000</td></tr>
-                    <tr className="border-b border-border/50"><td className="py-4">12×18</td><td>₹1125</td><td>₹1500</td><td>₹2000</td></tr>
-                    <tr className="border-b border-border/50"><td className="py-4">16×20</td><td>₹1500</td><td>₹2000</td><td>₹2800</td></tr>
-                    <tr><td className="py-4">20×30</td><td>—</td><td>₹3500</td><td>₹4500</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-8">
-              <div className="glass p-8 rounded-2xl">
-                <h3 className="text-2xl font-bold text-gold mb-6 border-b border-border pb-4">Slim LED Frames</h3>
-                <div className="flex flex-col gap-4">
-                  <div className="flex justify-between"><span>8×12</span><span className="text-gold font-bold">₹1650</span></div>
-                  <div className="flex justify-between"><span>12×18</span><span className="text-gold font-bold">₹2100</span></div>
-                  <div className="flex justify-between"><span>16×24</span><span className="text-gold font-bold">₹3300</span></div>
-                </div>
-              </div>
-              <div className="glass p-8 rounded-2xl">
-                <h3 className="text-2xl font-bold text-gold mb-6 border-b border-border pb-4">Wooden Printing</h3>
-                <div className="flex flex-col gap-4">
-                  <div className="flex justify-between"><span>8×12</span><span className="text-gold font-bold">₹1200</span></div>
-                  <div className="flex justify-between"><span>12×18</span><span className="text-gold font-bold">₹2000</span></div>
-                  <div className="flex justify-between"><span>16×20</span><span className="text-gold font-bold">₹3500</span></div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>

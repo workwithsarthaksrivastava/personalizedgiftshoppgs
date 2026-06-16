@@ -12,6 +12,10 @@ export default function SlideshowsManagement() {
   const categories = [
     { id: '_SLIDESHOW_HOME_', name: 'Homepage (Slideshow 1 - Desktop Background)' },
     { id: '_SLIDESHOW_HOME_2_', name: 'Homepage (Slideshow 2 - Below Hero)' },
+    { id: '_SLIDESHOW_EXPLORE_ALBUM_', name: 'Explore Section - Album Printing' },
+    { id: '_SLIDESHOW_EXPLORE_FRAME_', name: 'Explore Section - Photo Frames' },
+    { id: '_SLIDESHOW_EXPLORE_UV_', name: 'Explore Section - UV Printing' },
+    { id: '_SLIDESHOW_EXPLORE_SUB_', name: 'Explore Section - Sublimation Gifts' },
     { id: '_SLIDESHOW_UV_', name: 'Products - UV Printing' },
     { id: '_SLIDESHOW_ALBUM_', name: 'Products - Album Printing' },
     { id: '_SLIDESHOW_FRAME_', name: 'Products - Frame Printing' },

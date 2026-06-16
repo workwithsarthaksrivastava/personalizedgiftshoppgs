@@ -55,13 +55,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group">
-          <div className="w-10 h-10 bg-gold rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Sun className="text-bg w-6 h-6" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-display text-xl font-bold text-gold leading-none">Personalized</span>
-            <span className="font-display text-sm text-white/80 leading-none">Gift Shop</span>
-          </div>
+          <img src="/logo.png" alt="Surya Film Services Logo" className="h-10 md:h-12 w-auto object-contain transition-transform group-hover:scale-105" />
         </Link>
 
         {/* Desktop Nav */}

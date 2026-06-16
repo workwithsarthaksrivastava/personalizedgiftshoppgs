@@ -9,10 +9,7 @@ export default function Footer() {
         {/* Col 1 */}
         <div className="flex flex-col gap-4">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gold rounded-full flex items-center justify-center">
-              <Sun className="text-bg w-5 h-5" />
-            </div>
-            <span className="font-display text-xl font-bold text-gold">Personalized Gift Shop</span>
+            <img src="/logo.png" alt="Surya Film Services Logo" className="h-12 w-auto object-contain" />
           </Link>
           <p className="text-muted text-sm italic">
             "Aapki Yadon Ko Milta Hai Naya Roop"
