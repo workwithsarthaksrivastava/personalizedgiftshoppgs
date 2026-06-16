@@ -36,6 +36,21 @@ export default function SlideshowsManagement() {
     fetchSlides();
   }, []);
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit to prevent too large base64 strings
+        toast.error('Image is too large. Please upload an image under 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewSlideUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleAddSlide = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSlideUrl) return toast.error('Please enter an image URL');
@@ -80,34 +95,50 @@ export default function SlideshowsManagement() {
         </div>
       </div>
 
-      <form onSubmit={handleAddSlide} className="glass p-6 rounded-2xl flex flex-col md:flex-row gap-4 items-end">
-        <div className="flex-1 w-full relative">
-          <label className="block text-sm font-medium text-white/70 mb-2">Slideshow Location</label>
-          <select 
-            value={newSlideCategory}
-            onChange={(e) => setNewSlideCategory(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none text-white focus:border-gold transition-colors appearance-none"
-          >
-            {categories.map(c => (
-              <option key={c.id} value={c.id} className="bg-bg text-white">{c.name}</option>
-            ))}
-          </select>
+      <form onSubmit={handleAddSlide} className="glass p-6 rounded-2xl flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1 w-full relative">
+            <label className="block text-sm font-medium text-white/70 mb-2">Slideshow Location</label>
+            <select 
+              value={newSlideCategory}
+              onChange={(e) => setNewSlideCategory(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none text-white focus:border-gold transition-colors appearance-none"
+            >
+              {categories.map(c => (
+                <option key={c.id} value={c.id} className="bg-bg text-white">{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-[2] w-full flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-white/70 mb-2">Choose Image or URL</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="https://example.com/image.png"
+                  value={newSlideUrl}
+                  onChange={e => setNewSlideUrl(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none text-white focus:border-gold transition-colors"
+                />
+                <label className="bg-white/5 border border-white/10 hover:border-gold cursor-pointer rounded-xl px-4 py-3 flex items-center justify-center text-white transition-colors">
+                  <ImageIcon className="w-5 h-5 mr-2" />
+                  <span className="whitespace-nowrap">Upload File</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                </label>
+              </div>
+            </div>
+          </div>
+          <button type="submit" className="w-full md:w-auto bg-gold text-bg px-6 py-3 rounded-xl font-bold hover:bg-gold/90 transition-all flex items-center justify-center gap-2">
+            <Plus className="w-5 h-5" />
+            Add Slide
+          </button>
         </div>
-        <div className="flex-[2] w-full">
-          <label className="block text-sm font-medium text-white/70 mb-2">Image URL</label>
-          <input
-            type="text"
-            required
-            placeholder="https://example.com/image.png"
-            value={newSlideUrl}
-            onChange={e => setNewSlideUrl(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none text-white focus:border-gold transition-colors"
-          />
-        </div>
-        <button type="submit" className="w-full md:w-auto bg-gold text-bg px-6 py-3 rounded-xl font-bold hover:bg-gold/90 transition-all flex items-center justify-center gap-2">
-          <Plus className="w-5 h-5" />
-          Add Slide
-        </button>
+        {newSlideUrl && newSlideUrl.startsWith('data:image') && (
+          <div className="mt-4">
+            <p className="text-sm text-white/70 mb-2">Image Preview:</p>
+            <img src={newSlideUrl} alt="Preview" className="h-32 object-contain rounded-lg border border-white/10 shadow-lg" />
+          </div>
+        )}
       </form>
 
       <div className="space-y-8">
