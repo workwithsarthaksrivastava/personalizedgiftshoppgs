@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sun, Instagram, Facebook, Twitter, MessageCircle } from 'lucide-react';
+import logoUrl from '../assets/logo.png';
 
 export default function Footer() {
   return (
@@ -9,7 +10,7 @@ export default function Footer() {
         {/* Col 1 */}
         <div className="flex flex-col gap-4">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="Surya Film Services Logo" className="h-12 w-auto object-contain" />
+            <img src={logoUrl} alt="Surya Film Services Logo" className="h-12 w-auto object-contain" />
           </Link>
           <p className="text-muted text-sm italic">
             "Aapki Yadon Ko Milta Hai Naya Roop"
