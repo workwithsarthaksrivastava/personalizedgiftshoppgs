@@ -9,7 +9,7 @@ export default function Footer() {
         {/* Col 1 */}
         <div className="flex flex-col gap-4">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="Surya Film Services Logo" className="h-12 w-auto object-contain" />
+            <img src="/logo.png?v=3" alt="Surya Film Services Logo" className="h-12 w-auto object-contain" />
           </Link>
           <p className="text-muted text-sm italic">
             "Aapki Yadon Ko Milta Hai Naya Roop"
