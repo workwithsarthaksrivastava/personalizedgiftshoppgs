@@ -55,7 +55,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group">
-          <img src="/logo-transparent.png" alt="Surya Film Services Logo" className="h-10 md:h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+          <img src="/logo.png" alt="Surya Film Services Logo" className="h-10 md:h-12 w-auto object-contain transition-transform group-hover:scale-105" />
         </Link>
 
         {/* Desktop Nav */}
