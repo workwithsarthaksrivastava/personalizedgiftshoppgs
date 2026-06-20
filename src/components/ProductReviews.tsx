@@ -65,7 +65,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
          const { data, error } = await supabase
            .from('orders')
            .select('id')
-           .eq('customer_email', session.user.email)
+           .eq('customer_id', session.user.id)
            // ideally we'd check if this product is in the order, but we can't easily query JSON column `items` like that.
            .limit(1);
          if (data && data.length > 0) {

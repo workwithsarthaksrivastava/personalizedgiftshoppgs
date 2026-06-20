@@ -79,7 +79,6 @@ export default function SlideshowsManagement() {
   };
 
   const handleDeleteSlide = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this slide?')) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) {
       toast.error('Failed to delete slide');

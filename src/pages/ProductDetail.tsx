@@ -184,7 +184,11 @@ export default function ProductDetail() {
       if (!foundImage) toast.error('Model produced no image. Try a different prompt.');
     } catch (error: any) {
       console.error('AI Generation error:', error);
-      toast.error('AI Generation failed. Please try again.');
+      if (error?.message?.includes('429') || error?.status === 429 || error?.toString().includes('Quota')) {
+        toast.error('AI Quota exceeded. Please upgrade your API key or try again later.');
+      } else {
+        toast.error('AI Generation failed. Please try again.');
+      }
     } finally {
       setIsGenerating(false);
     }
