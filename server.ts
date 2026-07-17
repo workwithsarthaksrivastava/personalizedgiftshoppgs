@@ -303,19 +303,24 @@ async function startServer() {
           if (isValidUUID) {
             await supabaseClient.from("albums").upsert({ id, ...dbPayload });
           } else {
-            // Otherwise we let supabase generate its own ID, but save the returned ID to our local file too to keep them in sync
-            const { data, error } = await supabaseClient.from("albums").insert([dbPayload]).select("id").single();
-            if (data && !error) {
-              const newId = data.id;
-              const newFilePath = path.join(albumsDir, `${newId}.json`);
-              const updatedAlbumData = { ...albumData, id: newId };
-              fs.writeFileSync(newFilePath, JSON.stringify(updatedAlbumData, null, 2), "utf-8");
-              // delete the old temporary file if it existed under the old generated ID
-              if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            // Try to upsert the custom text ID directly (in case they updated the table schema in Supabase SQL editor)
+            const { error: textUpsertError } = await supabaseClient.from("albums").upsert({ id, ...dbPayload });
+            if (textUpsertError) {
+              console.log("Supabase direct custom ID upsert failed (likely uuid type column), falling back to letting Supabase generate a UUID:", textUpsertError.message);
+              // Fallback: Let Supabase auto-generate its own UUID
+              const { data, error } = await supabaseClient.from("albums").insert([dbPayload]).select("id").single();
+              if (data && !error) {
+                const newId = data.id;
+                const newFilePath = path.join(albumsDir, `${newId}.json`);
+                const updatedAlbumData = { ...albumData, id: newId };
+                fs.writeFileSync(newFilePath, JSON.stringify(updatedAlbumData, null, 2), "utf-8");
+                // delete the old temporary file if it existed under the old generated ID
+                if (fs.existsSync(filePath)) {
+                  fs.unlinkSync(filePath);
+                }
+                id = newId;
+                albumData.id = newId;
               }
-              id = newId;
-              albumData.id = newId;
             }
           }
         } catch (dbErr) {

@@ -8,9 +8,22 @@ export default function AlbumStudio() {
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [albumId, setAlbumId] = useState<string | null>(null);
-  
+
+  const generateUniqueId = (albumName: string) => {
+    const slug = albumName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-') // replace non-alphanumeric with hyphen
+      .replace(/^-+|-+$/g, '');   // remove leading/trailing hyphens
+    const random = Math.floor(1000 + Math.random() * 9000); // 4-digit code
+    return slug ? `${slug}-${random}` : `album-${Date.now()}`;
+  };
+
   // Album State
   const [title, setTitle] = useState('My Celebration Album');
+  const [proposedSlug, setProposedSlug] = useState(() => {
+    return 'my-celebration-album-' + Math.floor(1000 + Math.random() * 9000);
+  });
   const [template, setTemplate] = useState('Classic Royal');
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioName, setAudioName] = useState<string>('');
@@ -133,9 +146,10 @@ export default function AlbumStudio() {
 
   const saveAlbum = async () => {
     setIsSaving(true);
+    const finalId = albumId || proposedSlug;
     try {
       const payload = {
-        id: albumId,
+        id: finalId,
         title,
         template,
         audio_url: audioUrl,
@@ -203,7 +217,7 @@ export default function AlbumStudio() {
           </div>
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => navigate('/album/preview', { state: { album: { id: albumId, title, template, audio_url: audioUrl, cover_url: coverUrl, orientation, page_marking: pageMarking, spreads } } })}
+              onClick={() => navigate('/album/preview', { state: { album: { id: albumId || proposedSlug, title, template, audio_url: audioUrl, cover_url: coverUrl, orientation, page_marking: pageMarking, spreads } } })}
               className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg font-medium flex items-center gap-2 hover:bg-emerald-100 transition-colors"
             >
               <Layout className="w-4 h-4" /> Preview
@@ -239,10 +253,48 @@ export default function AlbumStudio() {
           <input 
             type="text" 
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={e => {
+              const val = e.target.value;
+              setTitle(val);
+              if (!albumId) {
+                setProposedSlug(generateUniqueId(val));
+              }
+            }}
             className="w-full text-2xl outline-none font-medium text-slate-900 border-b-2 border-transparent focus:border-slate-200 pb-2 transition-colors"
             placeholder="E.g., Surya & Aditi's Wedding"
           />
+          
+          <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="text-xs text-indigo-700">
+              <span className="font-semibold">Live Shareable Link:</span>{' '}
+              <span className="font-mono bg-white px-2 py-0.5 rounded border border-indigo-200 select-all">
+                https://personalizedgiftshop.in/album/{albumId || proposedSlug}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                const custom = prompt("Customize your unique Album URL slug:", albumId || proposedSlug);
+                if (custom) {
+                  const cleaned = custom
+                    .toLowerCase()
+                    .trim()
+                    .replace(/[^a-z0-9_-]+/g, '-')
+                    .replace(/^-+|-+$/g, '');
+                  if (cleaned) {
+                    if (albumId) {
+                      setAlbumId(cleaned);
+                    } else {
+                      setProposedSlug(cleaned);
+                    }
+                    toast.success('Unique slug updated!');
+                  }
+                }
+              }}
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline self-start sm:self-auto"
+            >
+              Customize URL
+            </button>
+          </div>
         </div>
 
         {/* Templates */}
