@@ -77,11 +77,16 @@ export default function AlbumViewer() {
           try {
             const res = await fetch(`/api/albums/${id}`);
             if (res.ok) {
-              const responseData = await res.json();
-              if (responseData.success && responseData.data) {
-                setAlbum(responseData.data);
-                setLoading(false);
-                return;
+              const contentType = res.headers.get("content-type");
+              if (contentType && contentType.includes("application/json")) {
+                const responseData = await res.json();
+                if (responseData.success && responseData.data) {
+                  setAlbum(responseData.data);
+                  setLoading(false);
+                  return;
+                }
+              } else {
+                console.warn("API returned non-JSON response, falling back to direct Supabase query.");
               }
             }
           } catch (serverErr) {
