@@ -203,7 +203,7 @@ export default function AlbumStudio() {
           </div>
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => navigate('/album/preview', { state: { album: { title, template, audio_url: audioUrl, cover_url: coverUrl, orientation, page_marking: pageMarking, spreads } } })}
+              onClick={() => navigate('/album/preview', { state: { album: { id: albumId, title, template, audio_url: audioUrl, cover_url: coverUrl, orientation, page_marking: pageMarking, spreads } } })}
               className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg font-medium flex items-center gap-2 hover:bg-emerald-100 transition-colors"
             >
               <Layout className="w-4 h-4" /> Preview

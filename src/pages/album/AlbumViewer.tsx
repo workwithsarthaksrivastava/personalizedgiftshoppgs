@@ -182,9 +182,11 @@ export default function AlbumViewer() {
 
   const theme = getThemeStyles(album.template);
 
-  const shareUrl = id && !id.startsWith('local_') && id !== 'preview'
-    ? `https://personalizedgiftshop.in/album/${id}`
-    : window.location.href;
+  const albumIdForShare = id !== 'preview' ? id : (album?.id || '');
+  const isSavedAlbum = albumIdForShare && !albumIdForShare.startsWith('local_') && albumIdForShare !== 'preview';
+  const shareUrl = isSavedAlbum
+    ? `https://personalizedgiftshop.in/album/${albumIdForShare}`
+    : '';
 
   const aspectClass = album.orientation === 'Portrait' ? 'aspect-[3/2]' : 'aspect-[8/3]';
 
@@ -228,9 +230,7 @@ export default function AlbumViewer() {
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center overflow-x-hidden transition-colors duration-1000 ${theme.font}`} style={{ backgroundColor: theme.bg }}>
       {/* Hidden Audio */}
-      {album.audio_url && (
-        <audio ref={audioRef} loop onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
-      )}
+      <audio ref={audioRef} loop onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
 
       {/* Floating Controls */}
       <div className="fixed top-6 left-6 right-6 flex items-center justify-between z-50 pointer-events-none">
@@ -249,7 +249,13 @@ export default function AlbumViewer() {
             </button>
           )}
           <button 
-            onClick={() => setShowQR(true)}
+            onClick={() => {
+              if (!isSavedAlbum) {
+                toast.error('Please save your album in the Studio first to generate a shareable QR code!');
+              } else {
+                setShowQR(true);
+              }
+            }}
             className="px-4 py-2 bg-amber-500 text-black font-semibold rounded-full hover:bg-amber-400 transition-colors text-sm flex items-center gap-2"
           >
             <QrCode className="w-4 h-4" /> Share
