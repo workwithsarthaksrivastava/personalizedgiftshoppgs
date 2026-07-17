@@ -68,21 +68,33 @@ export default function AlbumViewer() {
       try {
         if (id === 'preview' && location.state?.album) {
           setAlbum(location.state.album);
-          if (location.state.album.audio_url && audioRef.current) {
-            audioRef.current.src = location.state.album.audio_url;
-          }
           setLoading(false);
           return;
         }
 
+        // 1. Try to fetch from server fallback filesystem first (enables cross-device QR viewing)
+        if (id && id !== 'preview') {
+          try {
+            const res = await fetch(`/api/albums/${id}`);
+            if (res.ok) {
+              const responseData = await res.json();
+              if (responseData.success && responseData.data) {
+                setAlbum(responseData.data);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (serverErr) {
+            console.warn("Server album fetch failed, trying fallbacks", serverErr);
+          }
+        }
+
+        // 2. Fallback to client browser storage for local previews
         if (id?.startsWith('local_')) {
           const localData = localStorage.getItem('album_' + id);
           if (localData) {
             const parsed = JSON.parse(localData);
             setAlbum(parsed);
-            if (parsed.audio_url && audioRef.current) {
-              audioRef.current.src = parsed.audio_url;
-            }
           } else {
             toast.error('Local album not found');
           }
@@ -90,13 +102,10 @@ export default function AlbumViewer() {
           return;
         }
 
+        // 3. Fallback to direct Supabase query
         const { data, error } = await supabase.from('albums').select('*').eq('id', id).single();
         if (error) throw error;
         setAlbum(data);
-        
-        if (data.audio_url && audioRef.current) {
-          audioRef.current.src = data.audio_url;
-        }
       } catch (err) {
         console.error(err);
         toast.error('Album not found or error loading');
@@ -107,12 +116,50 @@ export default function AlbumViewer() {
     fetchAlbum();
   }, [id, location.state]);
 
+  // Robust immediate autoplay & first-interaction audio play fallback
+  useEffect(() => {
+    if (album?.audio_url && audioRef.current) {
+      audioRef.current.src = album.audio_url;
+      audioRef.current.load();
+      
+      const playAudio = () => {
+        if (!audioRef.current) return;
+        audioRef.current.play()
+          .then(() => {
+            setIsPlaying(true);
+            // Clean up interaction fallback listeners once playing starts
+            document.removeEventListener('click', playAudioWithInteraction);
+            document.removeEventListener('touchstart', playAudioWithInteraction);
+          })
+          .catch((err) => {
+            console.log("Browser blocked auto-play. Waiting for first interaction:", err);
+          });
+      };
+
+      const playAudioWithInteraction = () => {
+        playAudio();
+      };
+
+      // Attempt to play immediately
+      playAudio();
+
+      // Set up click/touch fallback listener in case of browser autoplay blocks
+      document.addEventListener('click', playAudioWithInteraction);
+      document.addEventListener('touchstart', playAudioWithInteraction);
+
+      return () => {
+        document.removeEventListener('click', playAudioWithInteraction);
+        document.removeEventListener('touchstart', playAudioWithInteraction);
+      };
+    }
+  }, [album]);
+
   const toggleAudio = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play().catch(() => toast.error('Browser blocked autoplay. Please interact first.'));
+      audioRef.current.play().catch(() => toast.error('Browser blocked play. Please interact first.'));
     }
     setIsPlaying(!isPlaying);
   };

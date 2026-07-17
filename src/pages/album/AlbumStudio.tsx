@@ -135,6 +135,7 @@ export default function AlbumStudio() {
     setIsSaving(true);
     try {
       const payload = {
+        id: albumId,
         title,
         template,
         audio_url: audioUrl,
@@ -143,22 +144,30 @@ export default function AlbumStudio() {
         page_marking: pageMarking,
         spreads
       };
-      
-      if (albumId && !albumId.startsWith('local_')) {
-        const { error } = await supabase.from('albums').update(payload).eq('id', albumId);
-        if (error) throw error;
-        toast.success('Album updated successfully!');
+
+      const res = await fetch('/api/albums', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save album on server');
+      }
+
+      const responseData = await res.json();
+      if (responseData.success && responseData.data) {
+        const savedAlbum = responseData.data;
+        setAlbumId(savedAlbum.id);
+        toast.success('Album saved successfully! You can now view and share it.');
       } else {
-        const { data, error } = await supabase.from('albums').insert([payload]).select('id').single();
-        if (error) {
-          throw error;
-        }
-        setAlbumId(data.id);
-        toast.success('Album created! You can now view and share it.');
+        throw new Error('Invalid response from server');
       }
     } catch (err: any) {
       console.error(err);
-      // Fallback to local storage
+      // Fallback to local storage in browser
       const localId = albumId && albumId.startsWith('local_') ? albumId : 'local_' + Date.now();
       const payload = {
         id: localId,
@@ -172,7 +181,7 @@ export default function AlbumStudio() {
       };
       localStorage.setItem('album_' + localId, JSON.stringify(payload));
       setAlbumId(localId);
-      toast.success('Saved locally for preview (Database missing)');
+      toast.success('Saved locally in browser (Server offline)');
     } finally {
       setIsSaving(false);
     }

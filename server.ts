@@ -226,6 +226,110 @@ async function startServer() {
     });
   });
 
+  // --- Server-Side Album Fallback Database ---
+  const albumsDir = path.join(process.cwd(), "data", "albums");
+  if (!fs.existsSync(albumsDir)) {
+    fs.mkdirSync(albumsDir, { recursive: true });
+  }
+
+  // Get album by ID
+  app.get("/api/albums/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const filePath = path.join(albumsDir, `${id}.json`);
+      if (fs.existsSync(filePath)) {
+        const fileContent = fs.readFileSync(filePath, "utf-8");
+        return res.json({ success: true, data: JSON.parse(fileContent) });
+      }
+
+      // If not found in local file system, see if we can get it from Supabase
+      const supabaseClient = getSupabaseClient();
+      if (supabaseClient) {
+        const { data, error } = await supabaseClient
+          .from("albums")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (error || !data) {
+          return res.status(404).json({ success: false, message: "Album not found in file system or database" });
+        }
+        return res.json({ success: true, data });
+      } else {
+        return res.status(404).json({ success: false, message: "Album not found on server" });
+      }
+    } catch (err: any) {
+      console.error("Error reading album:", err);
+      return res.status(500).json({ success: false, message: "Internal server error reading album", error: err.message });
+    }
+  });
+
+  // Save/Update album
+  app.post("/api/albums", async (req, res) => {
+    try {
+      const payload = req.body;
+      let id = payload.id;
+
+      // Generate stable ID if none provided or starts with local_ / preview
+      if (!id || id === "preview" || id.startsWith("local_")) {
+        id = `album_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      }
+
+      const albumData = {
+        ...payload,
+        id,
+        created_at: payload.created_at || new Date().toISOString()
+      };
+
+      const filePath = path.join(albumsDir, `${id}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+
+      // Also try to sync with Supabase if configured
+      const supabaseClient = getSupabaseClient();
+      if (supabaseClient) {
+        try {
+          const dbPayload = {
+            title: albumData.title,
+            template: albumData.template,
+            audio_url: albumData.audio_url,
+            cover_url: albumData.cover_url,
+            orientation: albumData.orientation,
+            page_marking: albumData.page_marking,
+            spreads: albumData.spreads
+          };
+          
+          // If the original id is a valid uuid, we can update or insert with it
+          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+          if (isValidUUID) {
+            await supabaseClient.from("albums").upsert({ id, ...dbPayload });
+          } else {
+            // Otherwise we let supabase generate its own ID, but save the returned ID to our local file too to keep them in sync
+            const { data, error } = await supabaseClient.from("albums").insert([dbPayload]).select("id").single();
+            if (data && !error) {
+              const newId = data.id;
+              const newFilePath = path.join(albumsDir, `${newId}.json`);
+              const updatedAlbumData = { ...albumData, id: newId };
+              fs.writeFileSync(newFilePath, JSON.stringify(updatedAlbumData, null, 2), "utf-8");
+              // delete the old temporary file if it existed under the old generated ID
+              if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+              }
+              id = newId;
+              albumData.id = newId;
+            }
+          }
+        } catch (dbErr) {
+          console.warn("Could not sync album to Supabase, but saved locally on server filesystem:", dbErr);
+        }
+      }
+
+      return res.json({ success: true, data: albumData });
+    } catch (err: any) {
+      console.error("Error saving album:", err);
+      return res.status(500).json({ success: false, message: "Internal server error saving album", error: err.message });
+    }
+  });
+
   // Razorpay order creation endpoint
   app.post("/api/create-razorpay-order", async (req, res) => {
     try {
