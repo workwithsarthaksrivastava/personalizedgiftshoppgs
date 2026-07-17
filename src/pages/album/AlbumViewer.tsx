@@ -108,9 +108,21 @@ export default function AlbumViewer() {
         }
 
         // 3. Fallback to direct Supabase query
-        const { data, error } = await supabase.from('albums').select('*').eq('id', id).single();
-        if (error) throw error;
-        setAlbum(data);
+        try {
+          const { data, error } = await supabase.from('albums').select('*').eq('id', id).single();
+          if (!error && data) {
+            setAlbum(data);
+            setLoading(false);
+            return;
+          }
+          if (error) {
+            console.warn("Supabase query fallback info:", error.message);
+          }
+        } catch (dbErr) {
+          console.warn("Supabase DB query error:", dbErr);
+        }
+
+        throw new Error("Album not found in server, local storage, or database.");
       } catch (err) {
         console.error(err);
         toast.error('Album not found or error loading');
