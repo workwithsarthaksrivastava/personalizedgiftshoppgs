@@ -10,7 +10,18 @@ export default function Footer() {
         {/* Col 1 */}
         <div className="flex flex-col gap-4">
           <Link to="/" className="flex items-center gap-2">
-            <img src={logoUrl} alt="Surya Film Services Logo" className="h-12 w-auto object-contain" />
+            <img 
+              src={logoUrl} 
+              alt="Surya Film Services Logo" 
+              className="h-12 w-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <div className="hidden text-2xl font-display font-bold text-gold tracking-wider">
+              SURYA <span className="text-white">FILMS</span>
+            </div>
           </Link>
           <p className="text-muted text-sm italic">
             "Aapki Yadon Ko Milta Hai Naya Roop"

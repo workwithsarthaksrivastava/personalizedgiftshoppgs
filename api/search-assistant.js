@@ -54,12 +54,12 @@ export default async function handler(req, res) {
         minPrice: 0,
         maxPrice,
         inStockOnly: lower.includes("stock") || lower.includes("available") || lower.includes("ready"),
-        aiInsight: \`Filtered for personalized gifts based on keywords. (Simple fallback filter applied)\`
+        aiInsight: `Filtered for personalized gifts based on keywords. (Simple fallback filter applied)`
       });
     }
 
-    const prompt = \`You are an expert AI Gift Shopping Assistant at a premium personalized gift shop.
-A user has typed the following search or filter request: "\${query}"
+    const prompt = `You are an expert AI Gift Shopping Assistant at a premium personalized gift shop.
+A user has typed the following search or filter request: "${query}"
 
 We have 4 main categories of custom products:
 1. 'Album Printing'
@@ -73,7 +73,7 @@ Extract the structured search criteria from the user's natural language input.
 - minPrice: Numeric value of minimum price requested (0 if not specified).
 - maxPrice: Numeric value of maximum price requested (0 if not specified, e.g. "under 500" -> maxPrice: 500).
 - inStockOnly: True if they specifically mention in stock, available, instock, ready, now. False otherwise.
-- aiInsight: A tiny, ultra-polite stylist insight (max 12 words) reacting to their search constraint cheerfully (e.g., "A perfect choice! Acrylic prints look stunning under warm room lights." or "These matching frames make for beautiful custom table accents."). Make it friendly and specific.\`;
+- aiInsight: A tiny, ultra-polite stylist insight (max 12 words) reacting to their search constraint cheerfully (e.g., "A perfect choice! Acrylic prints look stunning under warm room lights." or "These matching frames make for beautiful custom table accents."). Make it friendly and specific.`;
 
     const aiClient = getAiClient();
     if (!aiClient) throw new Error("AI not configured");

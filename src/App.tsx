@@ -1,8 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import Navbar from './components/Navbar';
-import Footer from './components/Footer';
+import AppLayout from './AppLayout';
 
 // Lazy load pages
 const Home = lazy(() => import('./pages/Home'));
@@ -24,6 +23,8 @@ const Privacy = lazy(() => import('./pages/Privacy'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Refunds = lazy(() => import('./pages/Refunds'));
 const Cancellations = lazy(() => import('./pages/Cancellations'));
+const AlbumStudio = lazy(() => import('./pages/album/AlbumStudio'));
+const AlbumViewer = lazy(() => import('./pages/album/AlbumViewer'));
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center bg-bg">
@@ -35,8 +36,7 @@ export default function App() {
   return (
     <Router>
       <div className="flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-grow">
+        <AppLayout>
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<Home />} />
@@ -47,6 +47,8 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/*" element={<Admin />} />
+              <Route path="/create-album" element={<AlbumStudio />} />
+              <Route path="/album/:id" element={<AlbumViewer />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/track" element={<TrackOrder />} />
@@ -60,8 +62,7 @@ export default function App() {
               <Route path="/cancellations" element={<Cancellations />} />
             </Routes>
           </Suspense>
-        </main>
-        <Footer />
+        </AppLayout>
         <Toaster position="bottom-right" theme="dark" richColors />
       </div>
     </Router>

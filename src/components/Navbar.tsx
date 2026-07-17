@@ -39,6 +39,7 @@ export default function Navbar() {
     { name: 'Home', path: '/' },
     { name: 'Products', path: '/products' },
     { name: 'Frame Studio', path: '/frame-studio' },
+    { name: 'Create Album', path: '/create-album' },
     { name: 'Enterprise', path: '/enterprise' },
     { name: 'Wishlist', path: '/wishlist' },
     { name: 'My Orders', path: '/orders' },
@@ -56,7 +57,20 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group">
-          <img src={logoUrl} alt="Surya Film Services Logo" className="h-10 md:h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+          <div className="relative flex items-center justify-center">
+            <img 
+              src={logoUrl} 
+              alt="Surya Film Services Logo" 
+              className="h-10 md:h-12 w-auto object-contain transition-transform group-hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <div className="hidden text-xl font-display font-bold text-gold tracking-wider">
+              SURYA <span className="text-white">FILMS</span>
+            </div>
+          </div>
         </Link>
 
         {/* Desktop Nav */}

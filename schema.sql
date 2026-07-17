@@ -54,3 +54,25 @@ CREATE POLICY "Enable read/write for users based on user_id" ON public.profiles 
 CREATE POLICY "Enable all access for orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
 
 -- Note: In a production environment, you should secure these policies to ensure users can only see their own orders.
+
+-- 5. Create the albums table
+CREATE TABLE IF NOT EXISTS public.albums (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  title text,
+  template text DEFAULT 'classic',
+  audio_url text,
+  cover_url text,
+  orientation text DEFAULT 'landscape',
+  page_marking text,
+  spreads jsonb DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.albums ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access
+CREATE POLICY "Enable read access for all users" ON public.albums FOR SELECT USING (true);
+
+-- Allow public write access (for simplicity)
+CREATE POLICY "Enable write access for all users" ON public.albums FOR ALL USING (true) WITH CHECK (true);
