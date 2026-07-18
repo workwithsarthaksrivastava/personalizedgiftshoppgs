@@ -67,11 +67,13 @@ export default function AlbumViewer() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
 
+  const stateAlbumStr = location.state?.album ? JSON.stringify(location.state.album) : '';
+
   useEffect(() => {
     const fetchAlbum = async () => {
       try {
-        if (id === 'preview' && location.state?.album) {
-          setAlbum(location.state.album);
+        if (id === 'preview' && stateAlbumStr) {
+          setAlbum(JSON.parse(stateAlbumStr));
           setLoading(false);
           return;
         }
@@ -135,12 +137,13 @@ export default function AlbumViewer() {
       }
     };
     fetchAlbum();
-  }, [id, location.state]);
+  }, [id, stateAlbumStr]);
 
   // Robust immediate autoplay & first-interaction audio play fallback
   useEffect(() => {
-    if (album?.audio_url && audioRef.current) {
-      audioRef.current.src = album.audio_url;
+    const audioUrl = album?.audio_url;
+    if (audioUrl && audioRef.current) {
+      audioRef.current.src = audioUrl;
       audioRef.current.load();
       
       const playAudio = () => {
@@ -173,7 +176,7 @@ export default function AlbumViewer() {
         document.removeEventListener('touchstart', playAudioWithInteraction);
       };
     }
-  }, [album]);
+  }, [album?.audio_url]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
