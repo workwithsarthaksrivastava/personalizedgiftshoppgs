@@ -19,34 +19,34 @@ const getThemeStyles = (template: string) => {
 };
 
 const CoverPage = ({ album, theme }: { album: any, theme: any }) => (
-  <div className="w-full h-full flex flex-col items-center justify-center p-8 relative overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
+  <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
     <div className="absolute inset-0 bg-black/40 z-10" />
-    {album.cover_url && <img src={album.cover_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="Cover" />}
-    <div className="relative z-20 text-center space-y-4 bg-black/60 p-8 rounded-xl backdrop-blur-md border border-white/10 shadow-2xl w-5/6 max-w-md">
-      <h1 className="text-2xl md:text-4xl font-bold drop-shadow-lg" style={{ color: theme.title }}>{album.title}</h1>
+    {album.cover_url && <img src={album.cover_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="Cover" referrerPolicy="no-referrer" />}
+    <div className="relative z-20 text-center space-y-2 sm:space-y-4 bg-black/60 p-4 sm:p-8 rounded-xl backdrop-blur-md border border-white/10 shadow-2xl w-11/12 sm:w-5/6 max-w-md">
+      <h1 className="text-xl sm:text-2xl md:text-4xl font-bold drop-shadow-lg" style={{ color: theme.title }}>{album.title}</h1>
     </div>
   </div>
 );
 
 const BackCover = ({ album, theme }: { album: any, theme: any }) => (
-  <div className="w-full h-full flex flex-col items-center justify-center p-8 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
-    <div className="text-center space-y-4 p-8 border border-white/5 rounded-xl bg-black/20">
-      <h2 className="text-xl md:text-2xl font-bold" style={{ color: theme.title }}>The End</h2>
-      <p className="text-white/50 text-[10px] tracking-widest uppercase">Created with Surya Films</p>
+  <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
+    <div className="text-center space-y-2 sm:space-y-4 p-4 sm:p-8 border border-white/5 rounded-xl bg-black/20">
+      <h2 className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: theme.title }}>The End</h2>
+      <p className="text-white/50 text-[8px] sm:text-[10px] tracking-widest uppercase">Created with Surya Films</p>
     </div>
   </div>
 );
 
 const AlbumPage = ({ image, marking, theme }: { image: string, marking: string, theme: any }) => (
   <div className="w-full h-full relative flex flex-col border-x border-black/5" style={{ backgroundColor: theme.pageBg }}>
-    <div className="flex-grow p-4 md:p-8 flex items-center justify-center">
+    <div className="flex-grow p-2 sm:p-4 md:p-8 flex items-center justify-center">
       {image ? (
-        <img src={image} className="max-w-full max-h-full object-contain drop-shadow-md rounded" alt="Page" />
+        <img src={image} className="max-w-full max-h-full object-contain drop-shadow-md rounded" alt="Page" referrerPolicy="no-referrer" />
       ) : (
-        <div className="w-full h-full border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300">Blank Page</div>
+        <div className="w-full h-full border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-xs sm:text-sm">Blank Page</div>
       )}
     </div>
-    {marking && <div className="text-center pb-4 text-[9px] md:text-[10px] font-medium tracking-widest uppercase" style={{ color: theme.text }}>{marking}</div>}
+    {marking && <div className="text-center pb-2 sm:pb-4 text-[8px] sm:text-[10px] font-medium tracking-widest uppercase" style={{ color: theme.text }}>{marking}</div>}
   </div>
 );
 
@@ -316,8 +316,8 @@ export default function AlbumViewer() {
       </div>
 
       {/* Mobile View Container (Visible on mobile, hidden on desktop) */}
-      <div className="w-full px-4 flex flex-col items-center justify-center gap-6 md:hidden mt-24">
-        <div className="relative w-full max-w-[360px] mx-auto">
+      <div className="w-full px-4 flex flex-col items-center justify-center gap-6 md:hidden mt-20 flex-grow">
+        <div className="relative w-full max-w-md sm:max-w-lg mx-auto">
           {/* Main Slide Stage */}
           <div className={`w-full ${singleAspectClass} rounded-2xl overflow-hidden shadow-2xl relative border border-white/10`}>
             <AnimatePresence mode="wait">
@@ -335,24 +335,24 @@ export default function AlbumViewer() {
           </div>
 
           {/* Navigation Overlay Arrows on Mobile */}
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 pointer-events-none">
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-1 sm:px-2 pointer-events-none">
             <button
               onClick={() => {
                 if (mobileIndex > 0) setMobileIndex(prev => prev - 1);
               }}
               disabled={mobileIndex === 0}
-              className="w-12 h-12 flex items-center justify-center bg-black/55 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-opacity pointer-events-auto shadow-lg border border-white/10 active:scale-95"
+              className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-black/55 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-opacity pointer-events-auto shadow-lg border border-white/10 active:scale-95"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
             <button
               onClick={() => {
                 if (mobileIndex < singlePages.length - 1) setMobileIndex(prev => prev + 1);
               }}
               disabled={mobileIndex === singlePages.length - 1}
-              className="w-12 h-12 flex items-center justify-center bg-black/55 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-opacity pointer-events-auto shadow-lg border border-white/10 active:scale-95"
+              className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-black/55 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-opacity pointer-events-auto shadow-lg border border-white/10 active:scale-95"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
         </div>

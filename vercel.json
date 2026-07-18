@@ -1,6 +1,11 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/album/api/albums/:id", "destination": "/api/albums.js?id=:id" },
+    { "source": "/album/api/albums", "destination": "/api/albums.js" },
+    { "source": "/album/api/:path*", "destination": "/api/:path*" },
+    { "source": "/api/albums/:id", "destination": "/api/albums.js?id=:id" },
+    { "source": "/api/albums", "destination": "/api/albums.js" },
+    { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/((?!assets|api|album/api).*)", "destination": "/index.html" }
   ]
 }
