@@ -158,7 +158,6 @@ export default function AlbumViewer() {
   const audioRef = useRef<HTMLAudioElement>(null);
   
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [mobileIndex, setMobileIndex] = useState(0);
 
   // Setup theme and structures safely (with defaults if album is not yet loaded)
   const theme = album ? getThemeStyles(album.template) : { bg: '#09090b', coverBg: '#18181b', pageBg: '#fdfbf7', text: '#27272a', title: '#f59e0b', font: 'font-sans' };
@@ -213,54 +212,6 @@ export default function AlbumViewer() {
       }
     }
   }
-
-  const singlePages: { content: React.ReactNode; label: string }[] = [];
-  if (album) {
-    singlePages.push({
-      content: <CoverPage album={album} theme={theme} />,
-      label: 'Cover'
-    });
-    if (album.spreads && album.spreads.length > 0) {
-      album.spreads.forEach((spread: any, idx: number) => {
-        singlePages.push({
-          content: (
-            <div className="w-full h-full relative">
-              <AlbumPage 
-                image={spread.leftImage} 
-                pageType={spread.leftPageType}
-                canvasImages={spread.leftCanvasImages}
-                marking={album.page_marking} 
-                theme={theme} 
-              />
-              <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-black/15 to-transparent z-10 pointer-events-none" />
-            </div>
-          ),
-          label: `Spread ${idx + 1} - Left`
-        });
-        singlePages.push({
-          content: (
-            <div className="w-full h-full relative">
-              <AlbumPage 
-                image={spread.rightImage} 
-                pageType={spread.rightPageType}
-                canvasImages={spread.rightCanvasImages}
-                marking={album.page_marking} 
-                theme={theme} 
-              />
-              <div className="absolute top-0 left-0 bottom-0 w-8 bg-gradient-to-r from-black/15 to-transparent z-10 pointer-events-none" />
-            </div>
-          ),
-          label: `Spread ${idx + 1} - Right`
-        });
-      });
-    }
-    singlePages.push({
-      content: <BackCover album={album} theme={theme} />,
-      label: 'Back Cover'
-    });
-  }
-
-  const singleAspectClass = album ? (album.orientation === 'Portrait' ? 'aspect-[2/3]' : 'aspect-[4/3]') : 'aspect-[4/3]';
 
   useEffect(() => {
     const fetchAlbum = async () => {
@@ -374,24 +325,12 @@ export default function AlbumViewer() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
-        if (window.innerWidth < 768) {
-          if (mobileIndex > 0) {
-            setMobileIndex(prev => prev - 1);
-          }
-        } else {
-          if (currentIndex > 0) {
-            setCurrentIndex(prev => prev - 1);
-          }
+        if (currentIndex > 0) {
+          setCurrentIndex(prev => prev - 1);
         }
       } else if (e.key === 'ArrowRight') {
-        if (window.innerWidth < 768) {
-          if (mobileIndex < singlePages.length - 1) {
-            setMobileIndex(prev => prev + 1);
-          }
-        } else {
-          if (currentIndex < sheets.length) {
-            setCurrentIndex(prev => prev + 1);
-          }
+        if (currentIndex < sheets.length) {
+          setCurrentIndex(prev => prev + 1);
         }
       }
     };
@@ -400,7 +339,7 @@ export default function AlbumViewer() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [currentIndex, mobileIndex, sheets.length, singlePages.length]);
+  }, [currentIndex, sheets.length]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
@@ -478,162 +417,113 @@ export default function AlbumViewer() {
         </div>
       </div>
 
-      {/* Mobile View Container (Visible on mobile, hidden on desktop) */}
-      <div className="w-full px-2 sm:px-6 flex flex-col items-center justify-center gap-6 md:hidden mt-20 flex-grow">
-        <div className="relative w-full max-w-xl sm:max-w-2xl mx-auto">
-          {/* Main Slide Stage */}
-          <div 
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const width = rect.width;
-              if (x < width / 2) {
-                if (mobileIndex > 0) setMobileIndex(prev => prev - 1);
-              } else {
-                if (mobileIndex < singlePages.length - 1) setMobileIndex(prev => prev + 1);
-              }
-            }}
-            className={`w-full ${singleAspectClass} rounded-2xl overflow-hidden shadow-2xl relative border border-white/10 cursor-pointer`}
+      {/* Unified Flipbook Container (Responsive) */}
+      <div className="w-full max-w-[98vw] md:max-w-6xl mx-auto flex flex-col items-center justify-center p-2 md:p-12 relative z-10 mt-20 md:mt-0 flex-grow">
+        
+        <div className="relative w-full flex items-center justify-center">
+          {/* Navigation Buttons */}
+          <button 
+            onClick={turnPrev} 
+            disabled={currentIndex === 0}
+            className="absolute left-1 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-all z-50 pointer-events-auto shadow-lg border border-white/10 active:scale-95"
           >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={mobileIndex}
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ duration: 0.25 }}
-                className="w-full h-full"
-              >
-                {singlePages[mobileIndex]?.content}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {/* Navigation Overlay Arrows on Mobile */}
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-1 sm:px-2 pointer-events-none">
-            <button
-              onClick={() => {
-                if (mobileIndex > 0) setMobileIndex(prev => prev - 1);
-              }}
-              disabled={mobileIndex === 0}
-              className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-black/55 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-opacity pointer-events-auto shadow-lg border border-white/10 active:scale-95"
-            >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-            <button
-              onClick={() => {
-                if (mobileIndex < singlePages.length - 1) setMobileIndex(prev => prev + 1);
-              }}
-              disabled={mobileIndex === singlePages.length - 1}
-              className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-black/55 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-opacity pointer-events-auto shadow-lg border border-white/10 active:scale-95"
-            >
-              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-          </div>
+            <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
+          </button>
+  
+          <button 
+            onClick={turnNext} 
+            disabled={currentIndex === sheets.length}
+            className="absolute right-1 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-all z-50 pointer-events-auto shadow-lg border border-white/10 active:scale-95"
+          >
+            <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
+          </button>
+  
+          <motion.div 
+            className={`relative w-full ${aspectClass} perspective-[2500px] drop-shadow-2xl px-10 sm:px-14 md:px-0`}
+            animate={{
+              x: currentIndex === 0 ? '-25%' : currentIndex === sheets.length ? '25%' : '0%'
+            }}
+            transition={{ duration: 0.8, type: 'spring', stiffness: 45, damping: 15 }}
+          >
+            {sheets.map((sheet, index) => {
+              const isFlipped = index < currentIndex;
+              let zIndex = 100 - Math.abs(currentIndex - index);
+              if (index === currentIndex || index === currentIndex - 1) {
+                zIndex = 150;
+              }
+  
+              return (
+                <motion.div
+                  key={index}
+                  initial={false}
+                  animate={{ rotateY: isFlipped ? -180 : 0 }}
+                  transition={{ duration: 0.8, type: 'spring', stiffness: 45, damping: 15 }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: '50%',
+                    height: '100%',
+                    transformOrigin: 'left center',
+                    transformStyle: 'preserve-3d',
+                    zIndex,
+                  }}
+                >
+                  {/* Front (Right Page) */}
+                  <div 
+                    className="absolute inset-0 cursor-pointer group rounded-r-md md:rounded-r-2xl shadow-[-1px_0_10px_rgba(0,0,0,0.1)]" 
+                    style={{ 
+                      backfaceVisibility: 'hidden', 
+                      WebkitBackfaceVisibility: 'hidden', 
+                      pointerEvents: isFlipped ? 'none' : 'auto',
+                      backgroundColor: theme.pageBg
+                    }}
+                    onClick={turnNext}
+                  >
+                    <div className="absolute top-0 left-0 bottom-0 w-8 md:w-16 bg-gradient-to-r from-black/20 via-black/5 to-transparent z-10 pointer-events-none" />
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-10 bg-black z-20 transition-opacity pointer-events-none rounded-r-md md:rounded-r-2xl" />
+                    <div className="w-full h-full rounded-r-md md:rounded-r-2xl overflow-hidden">
+                      {sheet.front}
+                    </div>
+                  </div>
+  
+                  {/* Back (Left Page) */}
+                  <div 
+                    className="absolute inset-0 cursor-pointer group rounded-l-md md:rounded-l-2xl shadow-[1px_0_10px_rgba(0,0,0,0.1)]" 
+                    style={{ 
+                      backfaceVisibility: 'hidden', 
+                      WebkitBackfaceVisibility: 'hidden', 
+                      transform: 'rotateY(180deg)',
+                      pointerEvents: isFlipped ? 'auto' : 'none',
+                      backgroundColor: theme.pageBg
+                    }}
+                    onClick={turnPrev}
+                  >
+                    <div className="absolute top-0 right-0 bottom-0 w-8 md:w-16 bg-gradient-to-l from-black/20 via-black/5 to-transparent z-10 pointer-events-none" />
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-10 bg-black z-20 transition-opacity pointer-events-none rounded-l-md md:rounded-l-2xl" />
+                    <div className="w-full h-full rounded-l-md md:rounded-l-2xl overflow-hidden">
+                      {sheet.back}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
         </div>
 
         {/* Page indicator and helpers */}
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 mt-8 md:mt-12">
           <span className="px-4 py-1.5 bg-black/45 backdrop-blur-md border border-white/10 text-white/90 rounded-full text-xs font-mono font-medium tracking-wide shadow-sm">
-            {singlePages[mobileIndex]?.label} • {mobileIndex + 1} of {singlePages.length}
+            {currentIndex === 0 
+              ? 'Cover' 
+              : currentIndex === sheets.length 
+                ? 'Back Cover' 
+                : `Spread ${currentIndex} of ${sheets.length - 1}`}
           </span>
-          <p className="text-white/40 text-[11px] text-center max-w-[250px]">
-            Tap the left/right side of the page or arrows to flip through
+          <p className="text-white/40 text-[11px] text-center max-w-[250px] md:max-w-md">
+            Tap the left/right side of the book, use arrow keys, or use the navigation buttons to turn pages.
           </p>
         </div>
-      </div>
-
-      {/* Main Album Container (Desktop/Tablet) */}
-      <div className="hidden md:flex w-full max-w-[95vw] md:max-w-6xl mx-auto items-center justify-center p-4 lg:p-12 relative z-10 mt-16 md:mt-0">
-        
-        {/* Navigation Buttons (Outside Book) */}
-        <button 
-          onClick={turnPrev} 
-          disabled={currentIndex === 0}
-          className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-all z-50 pointer-events-auto"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
- 
-        <button 
-          onClick={turnNext} 
-          disabled={currentIndex === sheets.length}
-          className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md disabled:opacity-0 transition-all z-50 pointer-events-auto"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
- 
-        <motion.div 
-          className={`relative w-full ${aspectClass} perspective-[2500px] drop-shadow-2xl`}
-          animate={{
-            x: currentIndex === 0 ? '-25%' : currentIndex === sheets.length ? '25%' : '0%'
-          }}
-          transition={{ duration: 0.8, type: 'spring', stiffness: 45, damping: 15 }}
-        >
-          {sheets.map((sheet, index) => {
-            const isFlipped = index < currentIndex;
-            let zIndex = 100 - Math.abs(currentIndex - index);
-            if (index === currentIndex || index === currentIndex - 1) {
-              zIndex = 150;
-            }
- 
-            return (
-              <motion.div
-                key={index}
-                initial={false}
-                animate={{ rotateY: isFlipped ? -180 : 0 }}
-                transition={{ duration: 0.8, type: 'spring', stiffness: 45, damping: 15 }}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  right: 0,
-                  width: '50%',
-                  height: '100%',
-                  transformOrigin: 'left center',
-                  transformStyle: 'preserve-3d',
-                  zIndex,
-                }}
-              >
-                {/* Front (Right Page) */}
-                <div 
-                  className="absolute inset-0 cursor-pointer group rounded-r-md md:rounded-r-2xl shadow-[-1px_0_10px_rgba(0,0,0,0.1)]" 
-                  style={{ 
-                    backfaceVisibility: 'hidden', 
-                    WebkitBackfaceVisibility: 'hidden', 
-                    pointerEvents: isFlipped ? 'none' : 'auto',
-                    backgroundColor: theme.pageBg
-                  }}
-                  onClick={turnNext}
-                >
-                  <div className="absolute top-0 left-0 bottom-0 w-8 md:w-16 bg-gradient-to-r from-black/20 via-black/5 to-transparent z-10 pointer-events-none" />
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-10 bg-black z-20 transition-opacity pointer-events-none rounded-r-md md:rounded-r-2xl" />
-                  <div className="w-full h-full rounded-r-md md:rounded-r-2xl overflow-hidden">
-                    {sheet.front}
-                  </div>
-                </div>
- 
-                {/* Back (Left Page) */}
-                <div 
-                  className="absolute inset-0 cursor-pointer group rounded-l-md md:rounded-l-2xl shadow-[1px_0_10px_rgba(0,0,0,0.1)]" 
-                  style={{ 
-                    backfaceVisibility: 'hidden', 
-                    WebkitBackfaceVisibility: 'hidden', 
-                    transform: 'rotateY(180deg)',
-                    pointerEvents: isFlipped ? 'auto' : 'none',
-                    backgroundColor: theme.pageBg
-                  }}
-                  onClick={turnPrev}
-                >
-                  <div className="absolute top-0 right-0 bottom-0 w-8 md:w-16 bg-gradient-to-l from-black/20 via-black/5 to-transparent z-10 pointer-events-none" />
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-10 bg-black z-20 transition-opacity pointer-events-none rounded-l-md md:rounded-l-2xl" />
-                  <div className="w-full h-full rounded-l-md md:rounded-l-2xl overflow-hidden">
-                    {sheet.back}
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
       </div>
 
       <AnimatePresence>
