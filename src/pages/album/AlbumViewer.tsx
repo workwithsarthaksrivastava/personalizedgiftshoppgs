@@ -160,6 +160,108 @@ export default function AlbumViewer() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
 
+  // Setup theme and structures safely (with defaults if album is not yet loaded)
+  const theme = album ? getThemeStyles(album.template) : { bg: '#09090b', coverBg: '#18181b', pageBg: '#fdfbf7', text: '#27272a', title: '#f59e0b', font: 'font-sans' };
+
+  const albumIdForShare = id !== 'preview' ? id : (album?.id || '');
+  const isSavedAlbum = albumIdForShare && !albumIdForShare.startsWith('local_') && albumIdForShare !== 'preview';
+  const shareUrl = isSavedAlbum
+    ? `https://personalizedgiftshop.in/album/${albumIdForShare}`
+    : '';
+
+  const aspectClass = album ? (album.orientation === 'Portrait' ? 'aspect-[3/2]' : 'aspect-[8/3]') : 'aspect-[8/3]';
+
+  const sheets: any[] = [];
+  if (album) {
+    if (!album.spreads || album.spreads.length === 0) {
+      sheets.push({
+        front: <CoverPage album={album} theme={theme} />,
+        back: <BackCover album={album} theme={theme} />
+      });
+    } else {
+      sheets.push({
+        front: <CoverPage album={album} theme={theme} />,
+        back: <AlbumPage 
+                image={album.spreads[0]?.leftImage} 
+                pageType={album.spreads[0]?.leftPageType}
+                canvasImages={album.spreads[0]?.leftCanvasImages}
+                marking={album.page_marking} 
+                theme={theme} 
+              />
+      });
+      for (let i = 0; i < album.spreads.length; i++) {
+        const currentSpread = album.spreads[i];
+        const nextSpread = album.spreads[i + 1];
+        sheets.push({
+          front: <AlbumPage 
+                   image={currentSpread.rightImage} 
+                   pageType={currentSpread.rightPageType}
+                   canvasImages={currentSpread.rightCanvasImages}
+                   marking={album.page_marking} 
+                   theme={theme} 
+                 />,
+          back: nextSpread 
+                  ? <AlbumPage 
+                      image={nextSpread.leftImage} 
+                      pageType={nextSpread.leftPageType}
+                      canvasImages={nextSpread.leftCanvasImages}
+                      marking={album.page_marking} 
+                      theme={theme} 
+                    /> 
+                  : <BackCover album={album} theme={theme} />
+        });
+      }
+    }
+  }
+
+  const singlePages: { content: React.ReactNode; label: string }[] = [];
+  if (album) {
+    singlePages.push({
+      content: <CoverPage album={album} theme={theme} />,
+      label: 'Cover'
+    });
+    if (album.spreads && album.spreads.length > 0) {
+      album.spreads.forEach((spread: any, idx: number) => {
+        singlePages.push({
+          content: (
+            <div className="w-full h-full relative">
+              <AlbumPage 
+                image={spread.leftImage} 
+                pageType={spread.leftPageType}
+                canvasImages={spread.leftCanvasImages}
+                marking={album.page_marking} 
+                theme={theme} 
+              />
+              <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-black/15 to-transparent z-10 pointer-events-none" />
+            </div>
+          ),
+          label: `Spread ${idx + 1} - Left`
+        });
+        singlePages.push({
+          content: (
+            <div className="w-full h-full relative">
+              <AlbumPage 
+                image={spread.rightImage} 
+                pageType={spread.rightPageType}
+                canvasImages={spread.rightCanvasImages}
+                marking={album.page_marking} 
+                theme={theme} 
+              />
+              <div className="absolute top-0 left-0 bottom-0 w-8 bg-gradient-to-r from-black/15 to-transparent z-10 pointer-events-none" />
+            </div>
+          ),
+          label: `Spread ${idx + 1} - Right`
+        });
+      });
+    }
+    singlePages.push({
+      content: <BackCover album={album} theme={theme} />,
+      label: 'Back Cover'
+    });
+  }
+
+  const singleAspectClass = album ? (album.orientation === 'Portrait' ? 'aspect-[2/3]' : 'aspect-[4/3]') : 'aspect-[4/3]';
+
   useEffect(() => {
     const fetchAlbum = async () => {
       try {
@@ -268,143 +370,6 @@ export default function AlbumViewer() {
     }
   }, [album]);
 
-  const toggleAudio = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(() => toast.error('Browser blocked play. Please interact first.'));
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
-        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!album) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-white">
-        <h2>Album not found</h2>
-      </div>
-    );
-  }
-
-  const theme = getThemeStyles(album.template);
-
-  const albumIdForShare = id !== 'preview' ? id : (album?.id || '');
-  const isSavedAlbum = albumIdForShare && !albumIdForShare.startsWith('local_') && albumIdForShare !== 'preview';
-  const shareUrl = isSavedAlbum
-    ? `https://personalizedgiftshop.in/album/${albumIdForShare}`
-    : '';
-
-  const aspectClass = album.orientation === 'Portrait' ? 'aspect-[3/2]' : 'aspect-[8/3]';
-
-  const sheets: any[] = [];
-  if (!album.spreads || album.spreads.length === 0) {
-    sheets.push({
-      front: <CoverPage album={album} theme={theme} />,
-      back: <BackCover album={album} theme={theme} />
-    });
-  } else {
-    sheets.push({
-      front: <CoverPage album={album} theme={theme} />,
-      back: <AlbumPage 
-              image={album.spreads[0]?.leftImage} 
-              pageType={album.spreads[0]?.leftPageType}
-              canvasImages={album.spreads[0]?.leftCanvasImages}
-              marking={album.page_marking} 
-              theme={theme} 
-            />
-    });
-    for (let i = 0; i < album.spreads.length; i++) {
-      const currentSpread = album.spreads[i];
-      const nextSpread = album.spreads[i + 1];
-      sheets.push({
-        front: <AlbumPage 
-                 image={currentSpread.rightImage} 
-                 pageType={currentSpread.rightPageType}
-                 canvasImages={currentSpread.rightCanvasImages}
-                 marking={album.page_marking} 
-                 theme={theme} 
-               />,
-        back: nextSpread 
-                ? <AlbumPage 
-                    image={nextSpread.leftImage} 
-                    pageType={nextSpread.leftPageType}
-                    canvasImages={nextSpread.leftCanvasImages}
-                    marking={album.page_marking} 
-                    theme={theme} 
-                  /> 
-                : <BackCover album={album} theme={theme} />
-      });
-    }
-  }
-
-  const turnNext = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (currentIndex < sheets.length) {
-      setCurrentIndex(prev => prev + 1);
-    }
-  };
-
-  const turnPrev = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
-    }
-  };
-
-  const singlePages: { content: React.ReactNode; label: string }[] = [];
-  singlePages.push({
-    content: <CoverPage album={album} theme={theme} />,
-    label: 'Cover'
-  });
-  if (album.spreads && album.spreads.length > 0) {
-    album.spreads.forEach((spread: any, idx: number) => {
-      singlePages.push({
-        content: (
-          <div className="w-full h-full relative">
-            <AlbumPage 
-              image={spread.leftImage} 
-              pageType={spread.leftPageType}
-              canvasImages={spread.leftCanvasImages}
-              marking={album.page_marking} 
-              theme={theme} 
-            />
-            <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-black/15 to-transparent z-10 pointer-events-none" />
-          </div>
-        ),
-        label: `Spread ${idx + 1} - Left`
-      });
-      singlePages.push({
-        content: (
-          <div className="w-full h-full relative">
-            <AlbumPage 
-              image={spread.rightImage} 
-              pageType={spread.rightPageType}
-              canvasImages={spread.rightCanvasImages}
-              marking={album.page_marking} 
-              theme={theme} 
-            />
-            <div className="absolute top-0 left-0 bottom-0 w-8 bg-gradient-to-r from-black/15 to-transparent z-10 pointer-events-none" />
-          </div>
-        ),
-        label: `Spread ${idx + 1} - Right`
-      });
-    });
-  }
-  singlePages.push({
-    content: <BackCover album={album} theme={theme} />,
-    label: 'Back Cover'
-  });
-
-  const singleAspectClass = album.orientation === 'Portrait' ? 'aspect-[2/3]' : 'aspect-[4/3]';
-
   // Handle keyboard arrow navigation (Left/Right arrow keys)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -436,6 +401,46 @@ export default function AlbumViewer() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [currentIndex, mobileIndex, sheets.length, singlePages.length]);
+
+  const toggleAudio = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(() => toast.error('Browser blocked play. Please interact first.'));
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const turnNext = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (currentIndex < sheets.length) {
+      setCurrentIndex(prev => prev + 1);
+    }
+  };
+
+  const turnPrev = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!album) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-white">
+        <h2>Album not found</h2>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center overflow-x-hidden transition-colors duration-1000 ${theme.font}`} style={{ backgroundColor: theme.bg }}>
