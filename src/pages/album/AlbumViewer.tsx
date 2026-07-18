@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import JSZip from 'jszip';
 import { supabase } from '../../supabase';
-import { Music, Play, Pause, QrCode, X, ChevronLeft, ChevronRight, Home, Download } from 'lucide-react';
+import { Music, Play, Pause, QrCode, X, ChevronLeft, ChevronRight, Home, Download, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 const getThemeStyles = (template: string) => {
@@ -61,6 +61,8 @@ export default function AlbumViewer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [hasShownPrompt, setHasShownPrompt] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -316,7 +318,7 @@ export default function AlbumViewer() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\${album.title || 'My Interactive Album'} - Offline Viewer</title>
+  <title>${album.title || 'My Interactive Album'} - Offline Viewer</title>
   <style>
     :root {
       --bg-color: ${themeStyles.bg};
@@ -493,13 +495,13 @@ export default function AlbumViewer() {
 </head>
 <body>
   <div class="header">
-    <div class="album-title">\${album.title || 'My Photobook'}</div>
-    \${album.audio_url ? \`
+    <div class="album-title">${album.title || 'My Photobook'}</div>
+    ${album.audio_url ? `
       <button id="musicBtn" class="btn">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
         Play Music
       </button>
-    \` : ''}
+    ` : ''}
   </div>
 
   <div class="main-container">
@@ -519,12 +521,12 @@ export default function AlbumViewer() {
     </div>
   </div>
 
-  \${album.audio_url ? \`
-    <audio id="bgAudio" loop src="\${hasOfflineAudio ? 'audio.mp3' : album.audio_url}"></audio>
-  \` : ''}
+  ${album.audio_url ? `
+    <audio id="bgAudio" loop src="${hasOfflineAudio ? 'audio.mp3' : album.audio_url}"></audio>
+  ` : ''}
 
   <script>
-    const album = \${JSON.stringify(album)};
+    const album = ${JSON.stringify(album)};
     let currentIndex = 0;
 
     const stage = document.getElementById('albumStage');
@@ -540,11 +542,11 @@ export default function AlbumViewer() {
       musicBtn.addEventListener('click', () => {
         if (isPlaying) {
           bgAudio.pause();
-          musicBtn.innerHTML = \`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> Play Music\`;
+          musicBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> Play Music';
         } else {
           bgAudio.play()
             .then(() => {
-              musicBtn.innerHTML = \`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> Pause Music\`;
+              musicBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> Pause Music';
             })
             .catch(e => {
               alert("Please click anywhere on this page first to unlock music, then play!");
@@ -564,9 +566,9 @@ export default function AlbumViewer() {
         pageNum.textContent = "Cover";
         stage.innerHTML = \`
           <div class="cover-view">
-            \${album.cover_url ? \`<img class="cover-bg-img" src="images/cover.jpg" alt="Cover Image">\` : ''}
+            ${album.cover_url ? `<img class="cover-bg-img" src="images/cover.jpg" alt="Cover Image">` : ''}
             <div class="cover-content">
-              <h1 class="cover-title">\${album.title || 'Personalized Album'}</h1>
+              <h1 class="cover-title">${(album.title || 'Personalized Album').replace(/"/g, '&quot;')}</h1>
               <p style="color: var(--title-color); opacity: 0.8; font-size: 13px; margin-top: 10px; font-weight: 500;">Offline Photobook Edition</p>
             </div>
           </div>
@@ -586,17 +588,17 @@ export default function AlbumViewer() {
         const spread = album.spreads[spreadIdx];
         pageNum.textContent = "Page " + (spreadIdx * 2 + 1) + " - " + (spreadIdx * 2 + 2);
         
-        const leftPath = spread.leftImage ? \`images/spread_\${spreadIdx + 1}_left.jpg\` : '';
-        const rightPath = spread.rightImage ? \`images/spread_\${spreadIdx + 1}_right.jpg\` : '';
+        const leftPath = spread.leftImage ? 'images/spread_' + (spreadIdx + 1) + '_left.jpg' : '';
+        const rightPath = spread.rightImage ? 'images/spread_' + (spreadIdx + 1) + '_right.jpg' : '';
 
         stage.innerHTML = \`
           <div class="page-half">
-            \${leftPath ? \`<img src="\${leftPath}" alt="Left Page">\` : '<div style="color: #bbb; font-style: italic;">Blank Page</div>'}
-            \${album.page_marking ? \`<div class="page-marking">\${album.page_marking}</div>\` : ''}
+            \${leftPath ? '<img src="' + leftPath + '" alt="Left Page">' : '<div style="color: #bbb; font-style: italic;">Blank Page</div>'}
+            ${album.page_marking ? `<div class="page-marking">${(album.page_marking).replace(/"/g, '&quot;')}</div>` : ''}
           </div>
           <div class="page-half">
-            \${rightPath ? \`<img src="\${rightPath}" alt="Right Page">\` : '<div style="color: #bbb; font-style: italic;">Blank Page</div>'}
-            \${album.page_marking ? \`<div class="page-marking">\${album.page_marking}</div>\` : ''}
+            \${rightPath ? '<img src="' + rightPath + '" alt="Right Page">' : '<div style="color: #bbb; font-style: italic;">Blank Page</div>'}
+            ${album.page_marking ? `<div class="page-marking">${(album.page_marking).replace(/"/g, '&quot;')}</div>` : ''}
           </div>
         \`;
       }
@@ -751,6 +753,22 @@ export default function AlbumViewer() {
   });
 
   const singleAspectClass = album.orientation === 'Portrait' ? 'aspect-[2/3]' : 'aspect-[3/2]';
+
+  // Trigger auto-download prompt once the album is completely flipped
+  useEffect(() => {
+    if (!album) return;
+    const isAtEndDesktop = currentIndex === sheets.length && sheets.length > 0;
+    const isAtEndMobile = mobileIndex === singlePages.length - 1 && singlePages.length > 0;
+
+    if ((isAtEndDesktop || isAtEndMobile) && !hasShownPrompt) {
+      // Small timeout for smooth animation transition
+      const timer = setTimeout(() => {
+        setShowPrompt(true);
+        setHasShownPrompt(true);
+      }, 900);
+      return () => clearTimeout(timer);
+    }
+  }, [currentIndex, mobileIndex, sheets.length, singlePages.length, album, hasShownPrompt]);
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center overflow-x-hidden transition-colors duration-1000 ${theme.font}`} style={{ backgroundColor: theme.bg }}>
@@ -985,6 +1003,59 @@ export default function AlbumViewer() {
               >
                 Copy Link
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showPrompt && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-950/95 border border-white/15 rounded-3xl p-6 md:p-8 max-w-md w-full text-center relative shadow-2xl"
+            >
+              <button 
+                onClick={() => setShowPrompt(false)}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/70 hover:text-white transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              
+              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-amber-400">
+                <Clock className="w-8 h-8 animate-pulse" />
+              </div>
+
+              <h3 className="text-2xl font-bold text-white mb-2">Keep Your Memories Forever!</h3>
+              
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-left mb-6 text-amber-200 text-xs md:text-sm leading-relaxed space-y-2">
+                <p className="font-semibold text-center text-amber-300">⚠️ Auto-Deletes After 15 Days</p>
+                <p>This beautiful photobook has been successfully compiled! However, to protect your privacy, all active albums are <strong>automatically deleted from our servers after 15 days</strong>.</p>
+              </div>
+
+              <p className="text-white/70 text-xs md:text-sm mb-6 leading-relaxed">
+                Download a fully self-contained offline ZIP archive now. You can open it on any device to view, flip pages, and play the background music offline forever!
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => {
+                    setShowPrompt(false);
+                    downloadAlbumZip();
+                  }}
+                  className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer animate-bounce"
+                >
+                  <Download className="w-4 h-4" /> Download Interactive ZIP
+                </button>
+                <button 
+                  onClick={() => setShowPrompt(false)}
+                  className="w-full py-2 bg-white/5 hover:bg-white/10 text-white/80 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                >
+                  I'll download it later / Keep viewing
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

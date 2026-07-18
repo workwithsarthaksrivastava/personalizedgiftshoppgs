@@ -241,6 +241,62 @@ async function startServer() {
     fs.mkdirSync(albumsDir, { recursive: true });
   }
 
+  // 15-day album auto-deletion routine
+  const cleanupExpiredAlbums = async () => {
+    try {
+      console.log("[Cleanup] Starting 15-day album auto-deletion routine...");
+      const fifteenDaysAgo = new Date();
+      fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+      const fifteenDaysAgoMs = fifteenDaysAgo.getTime();
+
+      // 1. Clean up local files
+      if (fs.existsSync(albumsDir)) {
+        const files = fs.readdirSync(albumsDir);
+        for (const file of files) {
+          if (file.endsWith(".json")) {
+            const filePath = path.join(albumsDir, file);
+            try {
+              const fileContent = fs.readFileSync(filePath, "utf-8");
+              const parsed = JSON.parse(fileContent);
+              
+              const createdAtStr = parsed.created_at;
+              const createdAtMs = createdAtStr ? new Date(createdAtStr).getTime() : 0;
+              
+              if (createdAtMs && createdAtMs < fifteenDaysAgoMs) {
+                console.log(`[Cleanup] Deleting expired local album file: ${file} (created at ${createdAtStr})`);
+                fs.unlinkSync(filePath);
+              }
+            } catch (err) {
+              const stats = fs.statSync(filePath);
+              if (stats.mtimeMs < fifteenDaysAgoMs) {
+                console.log(`[Cleanup] Deleting expired local album file by stat: ${file}`);
+                fs.unlinkSync(filePath);
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Clean up Supabase rows
+      const supabaseClient = getSupabaseClient();
+      if (supabaseClient) {
+        console.log(`[Cleanup] Checking for Supabase albums older than ${fifteenDaysAgo.toISOString()}`);
+        const { error } = await supabaseClient
+          .from("albums")
+          .delete()
+          .lt("created_at", fifteenDaysAgo.toISOString());
+
+        if (error) {
+          console.error("[Cleanup] Error during Supabase album cleanup:", error.message);
+        } else {
+          console.log("[Cleanup] Supabase album cleanup successful.");
+        }
+      }
+    } catch (err) {
+      console.error("[Cleanup] Unhandled error during album cleanup:", err);
+    }
+  };
+
   // Get album by ID
   app.get("/api/albums/:id", async (req, res) => {
     try {
@@ -686,12 +742,21 @@ Extract the structured search criteria from the user's natural language input.
   runDatabaseKeepAliveCheck().catch(err => {
     console.error("[Keep-Alive] Startup keep-alive check failed:", err);
   });
+  
+  // Run immediate 15-day album cleanup on startup
+  cleanupExpiredAlbums().catch(err => {
+    console.error("[Cleanup] Startup album cleanup failed:", err);
+  });
 
   // Set up continuous polling every 12 hours in case the container remains warm continuously
   setInterval(() => {
     console.log("[Keep-Alive] Running scheduled periodic keep-alive check...");
     runDatabaseKeepAliveCheck().catch(err => {
       console.error("[Keep-Alive] Periodic keep-alive check failed:", err);
+    });
+    console.log("[Cleanup] Running scheduled 15-day album cleanup...");
+    cleanupExpiredAlbums().catch(err => {
+      console.error("[Cleanup] Periodic album cleanup failed:", err);
     });
   }, STATUS_CHECK_INTERVAL_MS);
 
