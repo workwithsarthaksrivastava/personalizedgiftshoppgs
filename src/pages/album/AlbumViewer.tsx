@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import JSZip from 'jszip';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../supabase';
-import { Music, Play, Pause, QrCode, X, ChevronLeft, ChevronRight, Home, Download, Clock } from 'lucide-react';
+import { Music, Play, Pause, QrCode, X, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { toast } from 'sonner';
 
 const getThemeStyles = (template: string) => {
@@ -59,21 +59,16 @@ export default function AlbumViewer() {
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [hasShownPrompt, setHasShownPrompt] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
 
-  const stateAlbumStr = location.state?.album ? JSON.stringify(location.state.album) : '';
-
   useEffect(() => {
     const fetchAlbum = async () => {
       try {
-        if (id === 'preview' && stateAlbumStr) {
-          setAlbum(JSON.parse(stateAlbumStr));
+        if (id === 'preview' && location.state?.album) {
+          setAlbum(location.state.album);
           setLoading(false);
           return;
         }
@@ -137,13 +132,12 @@ export default function AlbumViewer() {
       }
     };
     fetchAlbum();
-  }, [id, stateAlbumStr]);
+  }, [id, location.state]);
 
   // Robust immediate autoplay & first-interaction audio play fallback
   useEffect(() => {
-    const audioUrl = album?.audio_url;
-    if (audioUrl && audioRef.current) {
-      audioRef.current.src = audioUrl;
+    if (album?.audio_url && audioRef.current) {
+      audioRef.current.src = album.audio_url;
       audioRef.current.load();
       
       const playAudio = () => {
@@ -176,7 +170,7 @@ export default function AlbumViewer() {
         document.removeEventListener('touchstart', playAudioWithInteraction);
       };
     }
-  }, [album?.audio_url]);
+  }, [album]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
@@ -186,477 +180,6 @@ export default function AlbumViewer() {
       audioRef.current.play().catch(() => toast.error('Browser blocked play. Please interact first.'));
     }
     setIsPlaying(!isPlaying);
-  };
-
-  const downloadAlbumZip = async () => {
-    if (!album) return;
-    setIsDownloading(true);
-    const toastId = toast.loading('Preparing offline album archive (fetching cover image)...');
-
-    try {
-      const themeStyles = getThemeStyles(album.template);
-      const zip = new JSZip();
-      const imgFolder = zip.folder("images");
-      if (!imgFolder) throw new Error("Could not create images folder inside ZIP");
-
-      // Robust helper to fetch image or audio as a Blob, with multiple fallback methods (direct CORS, canvas-based crossOrigin)
-      const fetchMediaAsBlob = async (url: string): Promise<Blob | null> => {
-        if (!url) return null;
-        if (url.startsWith('data:')) {
-          try {
-            const arr = url.split(',');
-            const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-            const bstr = atob(arr[1]);
-            let n = bstr.length;
-            const u8arr = new Uint8Array(n);
-            while (n--) {
-              u8arr[n] = bstr.charCodeAt(n);
-            }
-            return new Blob([u8arr], { type: mime });
-          } catch (e) {
-            console.error("Failed to parse data URL", e);
-            return null;
-          }
-        }
-
-        // Try direct fetch
-        try {
-          const res = await fetch(url, { mode: 'cors' });
-          if (res.ok) {
-            return await res.blob();
-          }
-        } catch (err) {
-          console.warn("Direct media fetch failed, trying canvas fallback:", url, err);
-        }
-
-        // Fallback to Image element + Canvas drawing (bypasses some browser strict policies if CORS headers match)
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.naturalWidth || img.width;
-              canvas.height = img.naturalHeight || img.height;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                canvas.toBlob((blob) => {
-                  resolve(blob);
-                }, 'image/jpeg', 0.9);
-                return;
-              }
-            } catch (canvasErr) {
-              console.error("Canvas conversion failed:", canvasErr);
-            }
-            resolve(null);
-          };
-          img.onerror = () => resolve(null);
-          img.src = url;
-        });
-      };
-
-      // 1. Fetch Cover image
-      if (album.cover_url) {
-        try {
-          const coverBlob = await fetchMediaAsBlob(album.cover_url);
-          if (coverBlob) {
-            imgFolder.file("cover.jpg", coverBlob);
-          }
-        } catch (coverErr) {
-          console.error("Failed to fetch cover image:", coverErr);
-        }
-      }
-
-      // 2. Fetch spreads
-      if (album.spreads && album.spreads.length > 0) {
-        for (let i = 0; i < album.spreads.length; i++) {
-          const spread = album.spreads[i];
-          toast.loading(`Fetching pages ${i * 2 + 1} & ${i * 2 + 2} of the album...`, { id: toastId });
-          
-          if (spread.leftImage) {
-            try {
-              const leftBlob = await fetchMediaAsBlob(spread.leftImage);
-              if (leftBlob) {
-                imgFolder.file(`spread_${i + 1}_left.jpg`, leftBlob);
-              }
-            } catch (leftErr) {
-              console.error(`Failed to fetch spread ${i + 1} left image:`, leftErr);
-            }
-          }
-          if (spread.rightImage) {
-            try {
-              const rightBlob = await fetchMediaAsBlob(spread.rightImage);
-              if (rightBlob) {
-                imgFolder.file(`spread_${i + 1}_right.jpg`, rightBlob);
-              }
-            } catch (rightErr) {
-              console.error(`Failed to fetch spread ${i + 1} right image:`, rightErr);
-            }
-          }
-        }
-      }
-
-      // 3. Fetch background music
-      let hasOfflineAudio = false;
-      if (album.audio_url) {
-        toast.loading("Downloading custom background music track...", { id: toastId });
-        try {
-          const audioBlob = await fetchMediaAsBlob(album.audio_url);
-          if (audioBlob) {
-            zip.file("audio.mp3", audioBlob);
-            hasOfflineAudio = true;
-          }
-        } catch (audioErr) {
-          console.warn("Background audio offline fetch failed", audioErr);
-        }
-      }
-
-      // 4. Create fully self-contained offline viewer page
-      toast.loading("Compiling interactive offline album viewer...", { id: toastId });
-      
-      const indexHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${album.title || 'My Interactive Album'} - Offline Viewer</title>
-  <style>
-    :root {
-      --bg-color: ${themeStyles.bg};
-      --cover-bg-color: ${themeStyles.coverBg};
-      --page-bg-color: ${themeStyles.pageBg};
-      --text-color: ${themeStyles.text};
-      --title-color: ${themeStyles.title};
-    }
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: var(--bg-color);
-      color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow-x: hidden;
-    }
-    .header {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      right: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 10;
-    }
-    .album-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--title-color);
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    .main-container {
-      width: 100%;
-      max-width: 90vw;
-      margin: auto;
-      padding: 60px 0 40px 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
-    }
-    .book-container {
-      position: relative;
-      width: 100%;
-      max-width: ${album.orientation === 'Portrait' ? '800px' : '1100px'};
-      aspect-ratio: ${album.orientation === 'Portrait' ? '1.33' : '2.66'};
-      background-color: var(--cover-bg-color);
-      border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
-      overflow: hidden;
-      display: flex;
-    }
-    @media (max-width: 768px) {
-      .book-container {
-        aspect-ratio: ${album.orientation === 'Portrait' ? '0.67' : '1.33'};
-        flex-direction: column;
-        max-width: 450px;
-      }
-    }
-    .page-half {
-      flex: 1;
-      height: 100%;
-      background-color: var(--page-bg-color);
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      box-sizing: border-box;
-      border-right: 1px solid rgba(0,0,0,0.06);
-    }
-    .page-half img {
-      max-width: 90%;
-      max-height: 85%;
-      object-fit: contain;
-      border-radius: 6px;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    }
-    .cover-view {
-      width: 100%;
-      height: 100%;
-      background-color: var(--cover-bg-color);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      text-align: center;
-    }
-    .cover-bg-img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      opacity: 0.55;
-    }
-    .cover-content {
-      position: relative;
-      z-index: 2;
-      background: rgba(0,0,0,0.65);
-      padding: 40px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.1);
-      backdrop-filter: blur(10px);
-      width: 80%;
-      max-width: 450px;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
-    }
-    .cover-title {
-      font-size: 2.25rem;
-      margin: 0;
-      color: var(--title-color);
-      text-transform: capitalize;
-    }
-    .page-marking {
-      position: absolute;
-      bottom: 20px;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      color: var(--text-color);
-      font-weight: 500;
-    }
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      margin-top: 15px;
-    }
-    .btn {
-      background: rgba(0,0,0,0.5);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: white;
-      padding: 12px 24px;
-      border-radius: 9999px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 0.875rem;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      backdrop-filter: blur(4px);
-    }
-    .btn:hover:not(:disabled) {
-      background: rgba(255,255,255,0.15);
-      border-color: rgba(255,255,255,0.3);
-      transform: translateY(-1px);
-    }
-    .btn:active:not(:disabled) {
-      transform: translateY(0);
-    }
-    .btn:disabled {
-      opacity: 0.25;
-      cursor: not-allowed;
-    }
-    .page-num {
-      background: rgba(255,255,255,0.1);
-      padding: 8px 16px;
-      border-radius: 9999px;
-      font-size: 0.8rem;
-      font-family: monospace;
-      border: 1px solid rgba(255,255,255,0.05);
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="album-title">${album.title || 'My Photobook'}</div>
-    ${album.audio_url ? `
-      <button id="musicBtn" class="btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-        Play Music
-      </button>
-    ` : ''}
-  </div>
-
-  <div class="main-container">
-    <div id="albumStage" class="book-container">
-      <!-- Generated dynamically -->
-    </div>
-    <div class="controls">
-      <button id="prevBtn" class="btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        Prev
-      </button>
-      <span id="pageNum" class="page-num">Cover</span>
-      <button id="nextBtn" class="btn">
-        Next
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-      </button>
-    </div>
-  </div>
-
-  ${album.audio_url ? `
-    <audio id="bgAudio" loop src="${hasOfflineAudio ? 'audio.mp3' : album.audio_url}"></audio>
-  ` : ''}
-
-  <script>
-    const album = ${JSON.stringify(album)};
-    let currentIndex = 0;
-
-    const stage = document.getElementById('albumStage');
-    const pageNum = document.getElementById('pageNum');
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const bgAudio = document.getElementById('bgAudio');
-    const musicBtn = document.getElementById('musicBtn');
-    
-    let isPlaying = false;
-
-    if (musicBtn && bgAudio) {
-      musicBtn.addEventListener('click', () => {
-        if (isPlaying) {
-          bgAudio.pause();
-          musicBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> Play Music';
-        } else {
-          bgAudio.play()
-            .then(() => {
-              musicBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> Pause Music';
-            })
-            .catch(e => {
-              alert("Please click anywhere on this page first to unlock music, then play!");
-            });
-        }
-        isPlaying = !isPlaying;
-      });
-    }
-
-    const totalViews = (album.spreads && album.spreads.length > 0) ? album.spreads.length + 2 : 2;
-
-    function render() {
-      prevBtn.disabled = currentIndex === 0;
-      nextBtn.disabled = currentIndex === totalViews - 1;
-
-      if (currentIndex === 0) {
-        pageNum.textContent = "Cover";
-        stage.innerHTML = \`
-          <div class="cover-view">
-            ${album.cover_url ? `<img class="cover-bg-img" src="images/cover.jpg" alt="Cover Image">` : ''}
-            <div class="cover-content">
-              <h1 class="cover-title">${(album.title || 'Personalized Album').replace(/"/g, '&quot;')}</h1>
-              <p style="color: var(--title-color); opacity: 0.8; font-size: 13px; margin-top: 10px; font-weight: 500;">Offline Photobook Edition</p>
-            </div>
-          </div>
-        \`;
-      } else if (currentIndex === totalViews - 1) {
-        pageNum.textContent = "Back Cover";
-        stage.innerHTML = \`
-          <div class="cover-view">
-            <div class="cover-content">
-              <h2 class="cover-title" style="font-size: 1.8rem;">The End</h2>
-              <p style="color: rgba(255,255,255,0.5); font-size: 10px; text-transform: uppercase; letter-spacing: 2px; margin-top: 15px;">Created with Surya Films</p>
-            </div>
-          </div>
-        \`;
-      } else {
-        const spreadIdx = currentIndex - 1;
-        const spread = album.spreads[spreadIdx];
-        pageNum.textContent = "Page " + (spreadIdx * 2 + 1) + " - " + (spreadIdx * 2 + 2);
-        
-        const leftPath = spread.leftImage ? 'images/spread_' + (spreadIdx + 1) + '_left.jpg' : '';
-        const rightPath = spread.rightImage ? 'images/spread_' + (spreadIdx + 1) + '_right.jpg' : '';
-
-        stage.innerHTML = \`
-          <div class="page-half">
-            \${leftPath ? '<img src="' + leftPath + '" alt="Left Page">' : '<div style="color: #bbb; font-style: italic;">Blank Page</div>'}
-            ${album.page_marking ? `<div class="page-marking">${(album.page_marking).replace(/"/g, '&quot;')}</div>` : ''}
-          </div>
-          <div class="page-half">
-            \${rightPath ? '<img src="' + rightPath + '" alt="Right Page">' : '<div style="color: #bbb; font-style: italic;">Blank Page</div>'}
-            ${album.page_marking ? `<div class="page-marking">${(album.page_marking).replace(/"/g, '&quot;')}</div>` : ''}
-          </div>
-        \`;
-      }
-    }
-
-    prevBtn.addEventListener('click', () => {
-      if (currentIndex > 0) {
-        currentIndex--;
-        render();
-      }
-    });
-
-    nextBtn.addEventListener('click', () => {
-      if (currentIndex < totalViews - 1) {
-        currentIndex++;
-        render();
-      }
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft' && currentIndex > 0) {
-        currentIndex--;
-        render();
-      } else if (e.key === 'ArrowRight' && currentIndex < totalViews - 1) {
-        currentIndex++;
-        render();
-      }
-    });
-
-    render();
-  </script>
-</body>
-</html>`;
-
-      zip.file("index.html", indexHtml);
-      zip.file("album.json", JSON.stringify(album, null, 2));
-
-      // Generate the ZIP file
-      toast.loading("Generating ZIP archive...", { id: toastId });
-      const content = await zip.generateAsync({ type: "blob" });
-
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(content);
-      const name = album.title ? album.title.toLowerCase().replace(/[^a-z0-9_-]+/g, '-') : 'album';
-      link.download = `${name}-archive.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('Offline interactive ZIP downloaded! Unzip it and open index.html to view and play audio offline.', { id: toastId });
-    } catch (err: any) {
-      console.error(err);
-      toast.error(`Failed to package offline ZIP: ${err.message || err}`, { id: toastId });
-    } finally {
-      setIsDownloading(false);
-    }
   };
 
   if (loading) {
@@ -680,7 +203,7 @@ export default function AlbumViewer() {
   const albumIdForShare = id !== 'preview' ? id : (album?.id || '');
   const isSavedAlbum = albumIdForShare && !albumIdForShare.startsWith('local_') && albumIdForShare !== 'preview';
   const shareUrl = isSavedAlbum
-    ? `${window.location.origin}/album/${albumIdForShare}`
+    ? `https://personalizedgiftshop.in/album/${albumIdForShare}`
     : '';
 
   const aspectClass = album.orientation === 'Portrait' ? 'aspect-[3/2]' : 'aspect-[8/3]';
@@ -756,22 +279,6 @@ export default function AlbumViewer() {
 
   const singleAspectClass = album.orientation === 'Portrait' ? 'aspect-[2/3]' : 'aspect-[3/2]';
 
-  // Trigger auto-download prompt once the album is completely flipped
-  useEffect(() => {
-    if (!album) return;
-    const isAtEndDesktop = currentIndex === sheets.length && sheets.length > 0;
-    const isAtEndMobile = mobileIndex === singlePages.length - 1 && singlePages.length > 0;
-
-    if ((isAtEndDesktop || isAtEndMobile) && !hasShownPrompt) {
-      // Small timeout for smooth animation transition
-      const timer = setTimeout(() => {
-        setShowPrompt(true);
-        setHasShownPrompt(true);
-      }, 900);
-      return () => clearTimeout(timer);
-    }
-  }, [currentIndex, mobileIndex, sheets.length, singlePages.length, album, hasShownPrompt]);
-
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center overflow-x-hidden transition-colors duration-1000 ${theme.font}`} style={{ backgroundColor: theme.bg }}>
       {/* Hidden Audio */}
@@ -789,31 +296,10 @@ export default function AlbumViewer() {
             <button 
               onClick={toggleAudio}
               className="w-10 h-10 flex items-center justify-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-black/60 transition-colors"
-              title="Toggle Background Music"
             >
               {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-1" />}
             </button>
           )}
-          <button
-            onClick={downloadAlbumZip}
-            disabled={isDownloading}
-            className="px-3 py-2 md:px-4 md:py-2 bg-slate-900/80 hover:bg-slate-800 text-white font-medium rounded-full border border-white/10 backdrop-blur-md transition-all text-xs md:text-sm flex items-center gap-1.5 md:gap-2 disabled:opacity-50 shadow-lg cursor-pointer"
-            title="Download full album as a self-contained offline ZIP archive"
-          >
-            {isDownloading ? (
-              <>
-                <span className="animate-spin text-xs">↻</span>
-                <span className="hidden xs:inline">Preparing...</span>
-                <span className="xs:hidden">Wait...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                <span className="hidden sm:inline">Download ZIP</span>
-                <span className="sm:hidden">Download</span>
-              </>
-            )}
-          </button>
           <button 
             onClick={() => {
               if (!isSavedAlbum) {
@@ -822,7 +308,7 @@ export default function AlbumViewer() {
                 setShowQR(true);
               }
             }}
-            className="px-4 py-2 bg-amber-500 text-black font-semibold rounded-full hover:bg-amber-400 transition-colors text-sm flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-amber-500 text-black font-semibold rounded-full hover:bg-amber-400 transition-colors text-sm flex items-center gap-2"
           >
             <QrCode className="w-4 h-4" /> Share
           </button>
@@ -994,13 +480,7 @@ export default function AlbumViewer() {
               <h3 className="text-xl font-bold text-slate-900 mb-2">Share Album</h3>
               <p className="text-slate-500 text-sm mb-6">Anyone can scan this QR code to view the album instantly without logging in.</p>
               <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 flex items-center justify-center mx-auto w-fit mb-6 shadow-sm">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`} 
-                  alt="Share QR Code"
-                  className="w-[200px] h-[200px]"
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                />
+                <QRCodeSVG value={shareUrl} size={200} level="H" includeMargin />
               </div>
               <button 
                 onClick={() => {
@@ -1011,59 +491,6 @@ export default function AlbumViewer() {
               >
                 Copy Link
               </button>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {showPrompt && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-950/95 border border-white/15 rounded-3xl p-6 md:p-8 max-w-md w-full text-center relative shadow-2xl"
-            >
-              <button 
-                onClick={() => setShowPrompt(false)}
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/70 hover:text-white transition-colors"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              
-              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-amber-400">
-                <Clock className="w-8 h-8 animate-pulse" />
-              </div>
-
-              <h3 className="text-2xl font-bold text-white mb-2">Keep Your Memories Forever!</h3>
-              
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-left mb-6 text-amber-200 text-xs md:text-sm leading-relaxed space-y-2">
-                <p className="font-semibold text-center text-amber-300">⚠️ Auto-Deletes After 15 Days</p>
-                <p>This beautiful photobook has been successfully compiled! However, to protect your privacy, all active albums are <strong>automatically deleted from our servers after 15 days</strong>.</p>
-              </div>
-
-              <p className="text-white/70 text-xs md:text-sm mb-6 leading-relaxed">
-                Download a fully self-contained offline ZIP archive now. You can open it on any device to view, flip pages, and play the background music offline forever!
-              </p>
-
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={() => {
-                    setShowPrompt(false);
-                    downloadAlbumZip();
-                  }}
-                  className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer animate-bounce"
-                >
-                  <Download className="w-4 h-4" /> Download Interactive ZIP
-                </button>
-                <button 
-                  onClick={() => setShowPrompt(false)}
-                  className="w-full py-2 bg-white/5 hover:bg-white/10 text-white/80 rounded-xl text-xs font-medium transition-colors cursor-pointer"
-                >
-                  I'll download it later / Keep viewing
-                </button>
-              </div>
             </motion.div>
           </motion.div>
         )}
