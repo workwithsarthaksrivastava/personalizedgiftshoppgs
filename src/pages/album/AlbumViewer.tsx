@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { QRCodeSVG } from 'qrcode.react';
 import JSZip from 'jszip';
 import { supabase } from '../../supabase';
 import { Music, Play, Pause, QrCode, X, ChevronLeft, ChevronRight, Home, Download, Clock } from 'lucide-react';
@@ -678,7 +677,7 @@ export default function AlbumViewer() {
   const albumIdForShare = id !== 'preview' ? id : (album?.id || '');
   const isSavedAlbum = albumIdForShare && !albumIdForShare.startsWith('local_') && albumIdForShare !== 'preview';
   const shareUrl = isSavedAlbum
-    ? `https://personalizedgiftshop.in/album/${albumIdForShare}`
+    ? `${window.location.origin}/album/${albumIdForShare}`
     : '';
 
   const aspectClass = album.orientation === 'Portrait' ? 'aspect-[3/2]' : 'aspect-[8/3]';
@@ -992,7 +991,13 @@ export default function AlbumViewer() {
               <h3 className="text-xl font-bold text-slate-900 mb-2">Share Album</h3>
               <p className="text-slate-500 text-sm mb-6">Anyone can scan this QR code to view the album instantly without logging in.</p>
               <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 flex items-center justify-center mx-auto w-fit mb-6 shadow-sm">
-                <QRCodeSVG value={shareUrl} size={200} level="H" includeMargin />
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`} 
+                  alt="Share QR Code"
+                  className="w-[200px] h-[200px]"
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                />
               </div>
               <button 
                 onClick={() => {
