@@ -330,7 +330,7 @@ export default function Products() {
     toast.loading('AI Gift Assistant is analyzing your matching requests...', { id: 'ai-search' });
 
     try {
-      const res = await fetch('/api/search-assistant', {
+      const res = await fetch('/album/api/search-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: aiInput })

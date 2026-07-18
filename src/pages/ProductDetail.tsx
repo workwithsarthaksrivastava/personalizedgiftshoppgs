@@ -225,7 +225,7 @@ export default function ProductDetail() {
             
             const candidateList = similarList && similarList.length > 0 ? similarList : MOCK_FALLBACK_PRODUCTS;
 
-            const resRecommendation = await fetch('/api/recommendations', {
+            const resRecommendation = await fetch('/album/api/recommendations', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

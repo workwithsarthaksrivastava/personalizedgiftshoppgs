@@ -159,7 +159,7 @@ export default function AlbumStudio() {
         spreads
       };
 
-      const res = await fetch('/api/albums', {
+      const res = await fetch('/album/api/albums', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

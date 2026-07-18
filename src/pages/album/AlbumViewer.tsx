@@ -75,7 +75,7 @@ export default function AlbumViewer() {
         // 1. Try to fetch from server fallback filesystem first (enables cross-device QR viewing)
         if (id && id !== 'preview') {
           try {
-            const res = await fetch(`/api/albums/${id}`);
+            const res = await fetch(`/album/api/albums/${id}`);
             if (res.ok) {
               const contentType = res.headers.get("content-type");
               if (contentType && contentType.includes("application/json")) {

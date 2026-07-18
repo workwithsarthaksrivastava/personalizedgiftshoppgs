@@ -117,7 +117,7 @@ export default function Checkout() {
   const verifyPaymentAndComplete = async (response: any, orderData: any) => {
     try {
       setLoading(true);
-      const res = await fetch('/api/verify-razorpay-payment', {
+      const res = await fetch('/album/api/verify-razorpay-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,7 +194,7 @@ export default function Checkout() {
         }
 
         // Create Razorpay Order with final total
-        const res = await fetch('/api/create-razorpay-order', {
+        const res = await fetch('/album/api/create-razorpay-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount: finalTotal, receipt: dbOrderId })

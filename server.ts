@@ -36,6 +36,15 @@ async function startServer() {
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
+  // Support running under a subdirectory proxy (e.g. /album/* mapped to this container)
+  // Rewrite incoming /album/api/* to /api/* so internal routes match correctly
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/album/api/')) {
+      req.url = req.url.replace('/album/api/', '/api/');
+    }
+    next();
+  });
+
   // Helper inside startServer to init supabase client
   const getSupabaseClient = () => {
     const url = (process.env.VITE_SUPABASE_URL || "").trim();

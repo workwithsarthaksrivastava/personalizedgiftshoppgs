@@ -57,7 +57,7 @@ CREATE POLICY "Enable all access for orders" ON public.orders FOR ALL USING (tru
 
 -- 5. Create the albums table
 CREATE TABLE IF NOT EXISTS public.albums (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  id text PRIMARY KEY,
   title text,
   template text DEFAULT 'classic',
   audio_url text,
