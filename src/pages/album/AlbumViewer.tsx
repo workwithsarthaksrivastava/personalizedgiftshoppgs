@@ -37,18 +37,114 @@ const BackCover = ({ album, theme }: { album: any, theme: any }) => (
   </div>
 );
 
-const AlbumPage = ({ image, marking, theme }: { image: string, marking: string, theme: any }) => (
-  <div className="w-full h-full relative flex flex-col border-x border-black/5" style={{ backgroundColor: theme.pageBg }}>
-    <div className="flex-grow p-2 sm:p-4 md:p-8 flex items-center justify-center">
-      {image ? (
-        <img src={image} className="max-w-full max-h-full object-contain drop-shadow-md rounded" alt="Page" referrerPolicy="no-referrer" />
+const BorderStylesMap: Record<string, { borderStyle?: string; customClass?: string }> = {
+  'none': { borderStyle: 'none' },
+  'solid': { borderStyle: 'solid' },
+  'dashed': { borderStyle: 'dashed' },
+  'double': { borderStyle: 'double' },
+  'groove': { borderStyle: 'groove' },
+  'ridge': { borderStyle: 'ridge' },
+  'ornate-gold': {
+    borderStyle: 'solid',
+    customClass: 'ring-4 ring-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.6)] bg-amber-500/5 p-1'
+  },
+  'ornate-silver': {
+    borderStyle: 'solid',
+    customClass: 'ring-4 ring-slate-300 shadow-[0_0_15px_rgba(203,213,225,0.6)] bg-slate-300/5 p-1'
+  },
+  'royal-red': {
+    borderStyle: 'solid',
+    customClass: 'ring-4 ring-rose-600 shadow-[0_0_18px_rgba(225,29,72,0.7)] bg-rose-600/5 p-1'
+  },
+  'pearl-inlay': {
+    borderStyle: 'double',
+    customClass: 'ring-2 ring-stone-200 shadow-[inset_0_0_10px_rgba(255,255,255,0.8),_0_0_10px_rgba(0,0,0,0.4)] bg-stone-100/5 p-1.5'
+  }
+};
+
+const AlbumPage = ({ 
+  image, 
+  pageType, 
+  canvasImages, 
+  marking, 
+  theme 
+}: { 
+  image?: string, 
+  pageType?: 'single' | 'canvas', 
+  canvasImages?: any[], 
+  marking: string, 
+  theme: any 
+}) => {
+  const isCanvas = pageType === 'canvas';
+  return (
+    <div className="w-full h-full relative flex flex-col border-x border-black/5" style={{ backgroundColor: theme.pageBg }}>
+      {isCanvas ? (
+        <div className="flex-grow relative w-full h-full overflow-hidden">
+          <div 
+            className="absolute inset-0 pointer-events-none" 
+            style={{
+              backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)',
+              backgroundSize: '20px 20px',
+              opacity: 0.8
+            }}
+          />
+          {canvasImages && canvasImages.length > 0 ? (
+            canvasImages.map((img: any) => {
+              const borderConfig = BorderStylesMap[img.borderType || 'none'] || { borderStyle: 'solid' };
+              const borderStyleProps = {
+                borderStyle: borderConfig.borderStyle || 'solid',
+                borderWidth: img.borderType === 'none' ? '0px' : `${img.borderWidth ?? 2}px`,
+                borderColor: img.borderColor || '#000000',
+              };
+
+              return (
+                <div 
+                  key={img.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${img.x}%`,
+                    top: `${img.y}%`,
+                    width: `${img.width}%`,
+                    height: `${img.height}%`,
+                    transform: `rotate(${img.rotation || 0}deg)`,
+                    transformOrigin: 'center center',
+                    zIndex: img.zIndex || 10,
+                  }}
+                  className="pointer-events-auto"
+                >
+                  {img.url ? (
+                    <img 
+                      src={img.url} 
+                      className={`w-full h-full object-cover rounded shadow-lg ${borderConfig.customClass || ''}`} 
+                      style={borderStyleProps}
+                      alt="Canvas Photo" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-[10px]">
+                      Empty Photo
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="w-full h-full border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-xs sm:text-sm">Empty Canvas</div>
+          )}
+        </div>
       ) : (
-        <div className="w-full h-full border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-xs sm:text-sm">Blank Page</div>
+        <div className="flex-grow p-2 sm:p-4 md:p-8 flex items-center justify-center">
+          {image ? (
+            <img src={image} className="max-w-full max-h-full object-contain drop-shadow-md rounded" alt="Page" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-xs sm:text-sm">Blank Page</div>
+          )}
+        </div>
       )}
+      {marking && <div className="text-center pb-2 sm:pb-4 text-[8px] sm:text-[10px] font-medium tracking-widest uppercase" style={{ color: theme.text }}>{marking}</div>}
     </div>
-    {marking && <div className="text-center pb-2 sm:pb-4 text-[8px] sm:text-[10px] font-medium tracking-widest uppercase" style={{ color: theme.text }}>{marking}</div>}
-  </div>
-);
+  );
+};
 
 import { useLocation } from 'react-router-dom';
 
@@ -217,15 +313,33 @@ export default function AlbumViewer() {
   } else {
     sheets.push({
       front: <CoverPage album={album} theme={theme} />,
-      back: <AlbumPage image={album.spreads[0]?.leftImage} marking={album.page_marking} theme={theme} />
+      back: <AlbumPage 
+              image={album.spreads[0]?.leftImage} 
+              pageType={album.spreads[0]?.leftPageType}
+              canvasImages={album.spreads[0]?.leftCanvasImages}
+              marking={album.page_marking} 
+              theme={theme} 
+            />
     });
     for (let i = 0; i < album.spreads.length; i++) {
       const currentSpread = album.spreads[i];
       const nextSpread = album.spreads[i + 1];
       sheets.push({
-        front: <AlbumPage image={currentSpread.rightImage} marking={album.page_marking} theme={theme} />,
+        front: <AlbumPage 
+                 image={currentSpread.rightImage} 
+                 pageType={currentSpread.rightPageType}
+                 canvasImages={currentSpread.rightCanvasImages}
+                 marking={album.page_marking} 
+                 theme={theme} 
+               />,
         back: nextSpread 
-                ? <AlbumPage image={nextSpread.leftImage} marking={album.page_marking} theme={theme} /> 
+                ? <AlbumPage 
+                    image={nextSpread.leftImage} 
+                    pageType={nextSpread.leftPageType}
+                    canvasImages={nextSpread.leftCanvasImages}
+                    marking={album.page_marking} 
+                    theme={theme} 
+                  /> 
                 : <BackCover album={album} theme={theme} />
       });
     }
@@ -255,7 +369,13 @@ export default function AlbumViewer() {
       singlePages.push({
         content: (
           <div className="w-full h-full relative">
-            <AlbumPage image={spread.leftImage} marking={album.page_marking} theme={theme} />
+            <AlbumPage 
+              image={spread.leftImage} 
+              pageType={spread.leftPageType}
+              canvasImages={spread.leftCanvasImages}
+              marking={album.page_marking} 
+              theme={theme} 
+            />
             <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-black/15 to-transparent z-10 pointer-events-none" />
           </div>
         ),
@@ -264,7 +384,13 @@ export default function AlbumViewer() {
       singlePages.push({
         content: (
           <div className="w-full h-full relative">
-            <AlbumPage image={spread.rightImage} marking={album.page_marking} theme={theme} />
+            <AlbumPage 
+              image={spread.rightImage} 
+              pageType={spread.rightPageType}
+              canvasImages={spread.rightCanvasImages}
+              marking={album.page_marking} 
+              theme={theme} 
+            />
             <div className="absolute top-0 left-0 bottom-0 w-8 bg-gradient-to-r from-black/15 to-transparent z-10 pointer-events-none" />
           </div>
         ),
@@ -277,7 +403,39 @@ export default function AlbumViewer() {
     label: 'Back Cover'
   });
 
-  const singleAspectClass = album.orientation === 'Portrait' ? 'aspect-[2/3]' : 'aspect-[3/2]';
+  const singleAspectClass = album.orientation === 'Portrait' ? 'aspect-[2/3]' : 'aspect-[4/3]';
+
+  // Handle keyboard arrow navigation (Left/Right arrow keys)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        if (window.innerWidth < 768) {
+          if (mobileIndex > 0) {
+            setMobileIndex(prev => prev - 1);
+          }
+        } else {
+          if (currentIndex > 0) {
+            setCurrentIndex(prev => prev - 1);
+          }
+        }
+      } else if (e.key === 'ArrowRight') {
+        if (window.innerWidth < 768) {
+          if (mobileIndex < singlePages.length - 1) {
+            setMobileIndex(prev => prev + 1);
+          }
+        } else {
+          if (currentIndex < sheets.length) {
+            setCurrentIndex(prev => prev + 1);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentIndex, mobileIndex, sheets.length, singlePages.length]);
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center overflow-x-hidden transition-colors duration-1000 ${theme.font}`} style={{ backgroundColor: theme.bg }}>
@@ -316,10 +474,22 @@ export default function AlbumViewer() {
       </div>
 
       {/* Mobile View Container (Visible on mobile, hidden on desktop) */}
-      <div className="w-full px-4 flex flex-col items-center justify-center gap-6 md:hidden mt-20 flex-grow">
-        <div className="relative w-full max-w-md sm:max-w-lg mx-auto">
+      <div className="w-full px-2 sm:px-6 flex flex-col items-center justify-center gap-6 md:hidden mt-20 flex-grow">
+        <div className="relative w-full max-w-xl sm:max-w-2xl mx-auto">
           {/* Main Slide Stage */}
-          <div className={`w-full ${singleAspectClass} rounded-2xl overflow-hidden shadow-2xl relative border border-white/10`}>
+          <div 
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const width = rect.width;
+              if (x < width / 2) {
+                if (mobileIndex > 0) setMobileIndex(prev => prev - 1);
+              } else {
+                if (mobileIndex < singlePages.length - 1) setMobileIndex(prev => prev + 1);
+              }
+            }}
+            className={`w-full ${singleAspectClass} rounded-2xl overflow-hidden shadow-2xl relative border border-white/10 cursor-pointer`}
+          >
             <AnimatePresence mode="wait">
               <motion.div
                 key={mobileIndex}
@@ -363,7 +533,7 @@ export default function AlbumViewer() {
             {singlePages[mobileIndex]?.label} • {mobileIndex + 1} of {singlePages.length}
           </span>
           <p className="text-white/40 text-[11px] text-center max-w-[250px]">
-            Tap the arrows to flip through pages
+            Tap the left/right side of the page or arrows to flip through
           </p>
         </div>
       </div>
@@ -389,7 +559,7 @@ export default function AlbumViewer() {
         </button>
  
         <motion.div 
-          className={`relative w-full ${aspectClass} perspective-[2500px] drop-shadow-2xl pointer-events-none`}
+          className={`relative w-full ${aspectClass} perspective-[2500px] drop-shadow-2xl`}
           animate={{
             x: currentIndex === 0 ? '-25%' : currentIndex === sheets.length ? '25%' : '0%'
           }}
