@@ -146,8 +146,28 @@ export default function AlbumStudio() {
 
   const saveAlbum = async () => {
     setIsSaving(true);
-    const finalId = albumId || proposedSlug;
+    const finalId = albumId && !albumId.startsWith('local_') ? albumId : proposedSlug;
+    
     try {
+      // 1. Uniqueness validation: check if ID already exists in Supabase for new/local-only saves
+      const isNew = !albumId || albumId.startsWith('local_');
+      if (isNew) {
+        const { data: existing, error: checkError } = await supabase
+          .from('albums')
+          .select('id')
+          .eq('id', finalId);
+
+        if (checkError) {
+          console.error("Supabase uniqueness check error details:", checkError);
+        }
+        if (existing && existing.length > 0) {
+          toast.error("This link name is already taken, please choose another.");
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // 2. Build complete payload
       const payload = {
         id: finalId,
         title,
@@ -159,43 +179,55 @@ export default function AlbumStudio() {
         spreads
       };
 
-      const res = await fetch('/album/api/albums', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
+      // 3. Save directly to Supabase and capture the error object explicitly
+      const { data, error: dbError } = await supabase
+        .from('albums')
+        .upsert(payload)
+        .select();
 
-      if (!res.ok) {
-        throw new Error('Failed to save album on server');
+      // Explicitly check error !== null (do NOT treat operation as successful if error is returned)
+      if (dbError !== null) {
+        console.error("Supabase Save Error Details:", dbError);
+        if (dbError.code === '23505') {
+          toast.error("This link name is already taken, please choose another.");
+        } else {
+          toast.error("Failed to save album — please try again");
+        }
+        setIsSaving(false);
+        return; // BLOCK PROGRESSION to "Share" / QR code generation / success state
       }
 
-      const responseData = await res.json();
-      if (responseData.success && responseData.data) {
-        const savedAlbum = responseData.data;
-        setAlbumId(savedAlbum.id);
-        toast.success('Album saved successfully! You can now view and share it.');
-      } else {
-        throw new Error('Invalid response from server');
+      // Confirm we got data back
+      if (!data || data.length === 0) {
+        console.error("Save completed but no data returned from database insert/upsert");
+        toast.error("Failed to save album — please try again");
+        setIsSaving(false);
+        return; // BLOCK PROGRESSION
       }
+
+      // 4. Update local server fallback filesystem (non-blocking server sync)
+      try {
+        await fetch('/album/api/albums', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (serverErr) {
+        console.warn("Express server disk sync failed (Supabase save succeeded):", serverErr);
+      }
+
+      // Clear the temporary local storage version since we've saved online
+      if (albumId && albumId.startsWith('local_')) {
+        localStorage.removeItem('album_' + albumId);
+      }
+
+      setAlbumId(finalId);
+      toast.success('Album saved successfully! You can now view and share it.');
     } catch (err: any) {
-      console.error(err);
-      // Fallback to local storage in browser
-      const localId = albumId && albumId.startsWith('local_') ? albumId : 'local_' + Date.now();
-      const payload = {
-        id: localId,
-        title,
-        template,
-        audio_url: audioUrl,
-        cover_url: coverUrl,
-        orientation,
-        page_marking: pageMarking,
-        spreads
-      };
-      localStorage.setItem('album_' + localId, JSON.stringify(payload));
-      setAlbumId(localId);
-      toast.success('Saved locally in browser (Server offline)');
+      console.error("Unexpected error in album save handler:", err);
+      toast.error("Failed to save album — please try again");
     } finally {
       setIsSaving(false);
     }
@@ -218,34 +250,59 @@ export default function AlbumStudio() {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/album/preview', { state: { album: { id: albumId || proposedSlug, title, template, audio_url: audioUrl, cover_url: coverUrl, orientation, page_marking: pageMarking, spreads } } })}
-              className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg font-medium flex items-center gap-2 hover:bg-emerald-100 transition-colors"
+              disabled={isSaving}
+              className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg font-medium flex items-center gap-2 hover:bg-emerald-100 transition-colors disabled:opacity-50"
             >
               <Layout className="w-4 h-4" /> Preview
             </button>
-            {albumId && (
+            {albumId && !albumId.startsWith('local_') && (
               <button 
                 onClick={() => navigate(`/album/${albumId}`)}
-                className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-medium flex items-center gap-2 hover:bg-indigo-100 transition-colors"
+                disabled={isSaving}
+                className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-medium flex items-center gap-2 hover:bg-indigo-100 transition-colors disabled:opacity-50"
               >
                 <QrCode className="w-4 h-4" /> Share / View
               </button>
             )}
             <button 
               onClick={() => navigate(-1)}
-              className="px-4 py-2 bg-white border border-slate-200 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors"
+              disabled={isSaving}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-50"
             >
               <ArrowLeft className="w-4 h-4" /> Return
             </button>
             <button 
               onClick={saveAlbum}
               disabled={isSaving}
-              className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium flex items-center gap-2 hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium flex items-center gap-2 hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              {isSaving ? <span className="animate-spin text-xl">↻</span> : <Save className="w-4 h-4" />} 
-              {albumId ? 'Update Album' : 'Save Album'}
+              {isSaving ? (
+                <>
+                  <span className="animate-spin text-sm">↻</span> Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" /> 
+                  {albumId && !albumId.startsWith('local_') ? 'Update Album' : 'Save Album'}
+                </>
+              )}
             </button>
           </div>
         </div>
+
+        {/* Local-only save warning banner */}
+        {albumId && albumId.startsWith('local_') && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <span>⚠️ <strong>This album is only saved on this device.</strong> Please retry saving online to enable sharing.</span>
+            <button 
+              onClick={saveAlbum}
+              disabled={isSaving}
+              className="px-4 py-2 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 transition-colors text-xs shrink-0 self-start sm:self-auto disabled:opacity-50"
+            >
+              {isSaving ? 'Saving...' : 'Retry Saving Online'}
+            </button>
+          </div>
+        )}
 
         {/* Title Input */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -256,7 +313,7 @@ export default function AlbumStudio() {
             onChange={e => {
               const val = e.target.value;
               setTitle(val);
-              if (!albumId) {
+              if (!albumId || albumId.startsWith('local_')) {
                 setProposedSlug(generateUniqueId(val));
               }
             }}
@@ -268,12 +325,12 @@ export default function AlbumStudio() {
             <div className="text-xs text-indigo-700">
               <span className="font-semibold">Live Shareable Link:</span>{' '}
               <span className="font-mono bg-white px-2 py-0.5 rounded border border-indigo-200 select-all">
-                https://personalizedgiftshop.in/album/{albumId || proposedSlug}
+                https://personalizedgiftshop.in/album/{albumId && !albumId.startsWith('local_') ? albumId : proposedSlug}
               </span>
             </div>
             <button
               onClick={() => {
-                const custom = prompt("Customize your unique Album URL slug:", albumId || proposedSlug);
+                const custom = prompt("Customize your unique Album URL slug:", albumId && !albumId.startsWith('local_') ? albumId : proposedSlug);
                 if (custom) {
                   const cleaned = custom
                     .toLowerCase()
@@ -281,7 +338,7 @@ export default function AlbumStudio() {
                     .replace(/[^a-z0-9_-]+/g, '-')
                     .replace(/^-+|-+$/g, '');
                   if (cleaned) {
-                    if (albumId) {
+                    if (albumId && !albumId.startsWith('local_')) {
                       setAlbumId(cleaned);
                     } else {
                       setProposedSlug(cleaned);

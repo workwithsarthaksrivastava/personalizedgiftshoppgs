@@ -643,6 +643,28 @@ Extract the structured search criteria from the user's natural language input.
     }
   });
 
+  // 404 handler for API routes
+  app.all(['/api/*', '/album/api/*'], (req, res) => {
+    res.status(404).json({
+      success: false,
+      message: `API route not found: ${req.method} ${req.url}`
+    });
+  });
+
+  // Global error handler for API routes
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("Unhandled API error:", err);
+    const isApi = req.url.startsWith('/api/') || req.url.startsWith('/album/api/');
+    if (isApi) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error occurred",
+        error: err.message || String(err)
+      });
+    }
+    next(err);
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
