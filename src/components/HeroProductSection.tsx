@@ -4,6 +4,36 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 
+const getFallbackHeroes = () => [
+  {
+    id: 'hero-1',
+    name: 'Luxe Wedding Photo Album',
+    price: 4500,
+    original_price: 5999,
+    category: 'Album Printing',
+    image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80',
+    description: 'Stunning double layflat professional photo albums with seamless panoramic page spreads, premium cover options, and lifetime crystal-clear digital hosting.'
+  },
+  {
+    id: 'hero-2',
+    name: 'Slim LED Frame 12x18',
+    price: 2100,
+    original_price: 2999,
+    category: 'Photo Frames',
+    image: 'https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=800&q=80',
+    description: 'Sleek slim backlit LED frame with elegant golden border finish, uniform brightness dispersion, and energy-efficient durable micro-LED panels.'
+  },
+  {
+    id: 'hero-3',
+    name: 'Acrylic Frame 8x12',
+    price: 525,
+    original_price: 799,
+    category: 'Photo Frames',
+    image: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=800&q=80',
+    description: 'Premium crystal-clear acrylic frames with custom 3D glass edge polish and sturdy aluminum desktop mounts for high definition prints.'
+  }
+];
+
 export default function HeroProductSection() {
   const [heroProducts, setHeroProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +43,11 @@ export default function HeroProductSection() {
     const fetchHeroProducts = async () => {
       try {
         const { data, error } = await supabase.from('products').select('*');
-        if (error) throw error;
+        if (error) {
+          console.warn("Supabase fetch returned error. Falling back to default premium heroes.", error.message);
+          setHeroProducts(getFallbackHeroes());
+          return;
+        }
         
         let foundHeroes: any[] = [];
         if (data && data.length > 0) {
@@ -29,9 +63,15 @@ export default function HeroProductSection() {
             return false;
           });
         }
-        setHeroProducts(foundHeroes);
-      } catch (err) {
-        console.error("Error fetching hero products:", err);
+        
+        if (foundHeroes.length === 0) {
+          setHeroProducts(getFallbackHeroes());
+        } else {
+          setHeroProducts(foundHeroes);
+        }
+      } catch (err: any) {
+        console.warn("Error fetching hero products, using beautiful fallback heroes:", err?.message || err);
+        setHeroProducts(getFallbackHeroes());
       } finally {
         setLoading(false);
       }

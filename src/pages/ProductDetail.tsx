@@ -265,8 +265,8 @@ export default function ProductDetail() {
         } else {
           setLoading(false);
         }
-      } catch (err) {
-        console.error("Error fetching product:", err);
+      } catch (err: any) {
+        console.warn("Error fetching product details, using local fallback if available:", err?.message || err);
         setLoading(false);
       }
     };

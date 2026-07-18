@@ -25,8 +25,8 @@ export default function Slideshow({ category = '_SLIDESHOW_HOME_', className = "
         if (!error && data && data.length > 0) {
           setImages(data.map(d => d.image));
         }
-      } catch (err) {
-        console.error('Error fetching dynamic slideshow:', err);
+      } catch (err: any) {
+        console.warn('Error fetching dynamic slideshow (using local placeholder fallback images):', err?.message || err);
       }
     };
     fetchSlides();

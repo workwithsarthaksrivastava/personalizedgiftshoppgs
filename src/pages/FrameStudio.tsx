@@ -126,7 +126,7 @@ export default function FrameStudio() {
           ]);
         }
       } catch (error: any) {
-        console.error('Error fetching frames:', error);
+        console.warn('Error fetching frames, using default frames instead:', error?.message || error);
       } finally {
         setLoading(false);
       }

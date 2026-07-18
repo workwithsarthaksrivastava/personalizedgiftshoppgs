@@ -5,7 +5,7 @@ import Footer from './components/Footer';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const isAlbumViewer = location.pathname.startsWith('/album/');
+  const isAlbumViewer = location.pathname.startsWith('/album/') || location.pathname.startsWith('/create-album');
   
   if (isAlbumViewer) {
     return <>{children}</>;
