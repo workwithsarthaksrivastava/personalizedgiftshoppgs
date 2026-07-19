@@ -27,7 +27,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../supabase';
+import { supabase, deserializeAlbumFromSupabase } from '../supabase';
 
 /* ========================================================
    DASHBOARD TAB OVERVIEW
@@ -61,7 +61,7 @@ export function DashboardOverviewTab({ onNavigateTab, totalAlbums = 0 }: { onNav
       let albumsCreatedToday = 0;
       let imagesUploadedToday = 0;
 
-      const fetchedList = data || [];
+      const fetchedList = (data || []).map(deserializeAlbumFromSupabase);
       fetchedList.forEach((album: any) => {
         totalOnlineAlbums++;
         const spreads = album.spreads || [];

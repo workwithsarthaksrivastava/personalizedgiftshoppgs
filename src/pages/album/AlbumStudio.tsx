@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabase';
+import { supabase, serializeAlbumForSupabase, deserializeAlbumFromSupabase } from '../../supabase';
 import { toast } from 'sonner';
 import { Album, Spread } from '../../types/album';
 
@@ -99,7 +99,7 @@ export default function AlbumStudio() {
         }
       }
 
-      const fetchedList = data || [];
+      const fetchedList = (data || []).map(deserializeAlbumFromSupabase);
       
       // Combine all. Only real user albums!
       let combined = [...fetchedList, ...localAlbums];
@@ -174,13 +174,14 @@ export default function AlbumStudio() {
     setAlbums(prev => prev.map(a => a.id === id ? { ...a, is_public: updatedPublic } : a));
 
     try {
+      const updatedAlbum = { ...album, is_public: updatedPublic };
       if (!id.startsWith('local_')) {
+        const serialized = serializeAlbumForSupabase(updatedAlbum);
         await supabase
           .from('albums')
-          .update({ is_public: updatedPublic })
+          .update({ page_marking: serialized.page_marking })
           .eq('id', id);
       } else {
-        const updatedAlbum = { ...album, is_public: updatedPublic };
         localStorage.setItem('album_' + id, JSON.stringify(updatedAlbum));
       }
       toast.success(`Album is now ${updatedPublic ? 'Publicly shareable' : 'Private'}`);
@@ -209,13 +210,14 @@ export default function AlbumStudio() {
     setAlbums(prev => prev.map(a => a.id === id ? { ...a, view_lock_pin: updatedPin } : a));
 
     try {
+      const updatedAlbum = { ...album, view_lock_pin: updatedPin };
       if (!id.startsWith('local_')) {
+        const serialized = serializeAlbumForSupabase(updatedAlbum);
         await supabase
           .from('albums')
-          .update({ view_lock_pin: updatedPin })
+          .update({ page_marking: serialized.page_marking })
           .eq('id', id);
       } else {
-        const updatedAlbum = { ...album, view_lock_pin: updatedPin };
         localStorage.setItem('album_' + id, JSON.stringify(updatedAlbum));
       }
       toast.success(updatedPin ? `🔐 Album password protection set (PIN: ${updatedPin})` : '🔓 Album unlocked');
@@ -242,6 +244,7 @@ export default function AlbumStudio() {
     const randomCode = Math.floor(1000 + Math.random() * 9000);
     const finalId = activeAlbum.id ? activeAlbum.id : `${cleanedSlug}-${randomCode}`;
 
+    const isNewAlbum = !activeAlbum.id;
     const newAlbumPayload: Album = {
       ...activeAlbum,
       id: finalId,
@@ -251,17 +254,35 @@ export default function AlbumStudio() {
       created_at: activeAlbum.created_at || new Date().toISOString()
     };
 
+    const dbPayload = serializeAlbumForSupabase(newAlbumPayload);
+
     try {
       // 1. Try saving directly to Supabase
-      const { error: dbError } = await supabase
-        .from('albums')
-        .upsert(newAlbumPayload);
+      console.log("Saving album to Supabase...", dbPayload);
+      
+      const query = isNewAlbum 
+        ? supabase.from('albums').insert([dbPayload]).select()
+        : supabase.from('albums').upsert(dbPayload).select();
+
+      const response = await query;
+      
+      // LOG SUPABASE RESPONSE EXACTLY AS REQUESTED
+      console.log("Supabase response:", { data: response.data, error: response.error });
+
+      const dbError = response.error;
 
       if (dbError) {
-        console.warn("Supabase saving bypassed or failed. Saving to local storage fallback:", dbError);
+        console.error("Supabase Save Error Details:", dbError);
+        toast.error(`Failed to publish online: ${dbError.message || 'Unknown database error'}`);
+        
         // Fallback to local storage
-        localStorage.setItem('album_local_' + finalId, JSON.stringify({ ...newAlbumPayload, id: 'local_' + finalId }));
-        toast.warning('Offline Save: Album saved locally on this browser. Share disabled.');
+        try {
+          localStorage.setItem('album_local_' + finalId, JSON.stringify({ ...newAlbumPayload, id: 'local_' + finalId }));
+          toast.warning('Offline Save: Saved locally on this browser as a fallback. Share disabled.');
+        } catch (storageErr: any) {
+          console.error("Local storage fallback failed:", storageErr);
+          toast.error(`Local storage fallback also failed: ${storageErr.message || 'Storage limit exceeded'}`);
+        }
       } else {
         toast.success('✨ Album published online! Share link or stamp with your client.');
       }
@@ -280,9 +301,9 @@ export default function AlbumStudio() {
       await loadAlbums();
       setActiveTab('my-albums');
       setActiveAlbum(initialBlankAlbum());
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Error saving album. Please check image sizing is optimized.');
+      toast.error(`Error saving album: ${err.message || 'Please check image sizing is optimized.'}`);
     } finally {
       setIsSaving(false);
     }

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
-import { supabase } from '../../supabase';
+import { supabase, deserializeAlbumFromSupabase } from '../../supabase';
 import { 
   Music, Play, Pause, QrCode, X, ChevronLeft, ChevronRight, Home,
   Heart, Eye, Share2, Star, MessageSquare, Phone, MapPin, Sliders, Settings, 
@@ -387,7 +387,7 @@ export default function AlbumViewer() {
         try {
           const { data, error } = await supabase.from('albums').select('*').eq('id', id).single();
           if (!error && data) {
-            setAlbum(data);
+            setAlbum(deserializeAlbumFromSupabase(data));
             setLoading(false);
             return;
           }

@@ -28,6 +28,77 @@ const getAiClient = () => {
   return ai;
 };
 
+function serializeAlbumForSupabase(album: any): any {
+  const dbPayload = {
+    id: album.id,
+    title: album.title || '',
+    template: album.template || 'classic',
+    audio_url: album.audio_url || '',
+    cover_url: album.cover_url || '',
+    orientation: album.orientation || 'landscape',
+    spreads: album.spreads || [],
+    created_at: album.created_at || new Date().toISOString()
+  };
+
+  const metadata = {
+    audio_name: album.audio_name,
+    back_cover_url: album.back_cover_url,
+    inner_front_url: album.inner_front_url,
+    inner_back_url: album.inner_back_url,
+    combined_inner_url: album.combined_inner_url,
+    is_combined_inner: album.is_combined_inner,
+    client_name: album.client_name,
+    function_name: album.function_name,
+    function_date: album.function_date,
+    view_lock_pin: album.view_lock_pin,
+    is_public: album.is_public,
+    status: album.status,
+    job_number: album.job_number,
+    studio_name: album.studio_name,
+    photographer_name: album.photographer_name,
+    mobile_number: album.mobile_number,
+    views_count: album.views_count,
+    likes_count: album.likes_count,
+    comments: album.comments
+  };
+
+  const pageMarkingObj = {
+    user_page_marking: album.page_marking || '',
+    metadata
+  };
+
+  return {
+    ...dbPayload,
+    page_marking: JSON.stringify(pageMarkingObj)
+  };
+}
+
+function deserializeAlbumFromSupabase(dbAlbum: any): any {
+  if (!dbAlbum) return dbAlbum;
+
+  let page_marking = dbAlbum.page_marking || '';
+  let extraMetadata: any = {};
+
+  if (typeof page_marking === 'string' && (page_marking.startsWith('{') || page_marking.startsWith('['))) {
+    try {
+      const parsed = JSON.parse(page_marking);
+      if (parsed && typeof parsed === 'object') {
+        page_marking = parsed.user_page_marking || '';
+        if (parsed.metadata) {
+          extraMetadata = parsed.metadata;
+        }
+      }
+    } catch (e) {
+      // Not JSON or parse failed
+    }
+  }
+
+  return {
+    ...dbAlbum,
+    ...extraMetadata,
+    page_marking
+  };
+}
 
 async function startServer() {
   const app = express();
@@ -268,7 +339,7 @@ async function startServer() {
             .single();
 
           if (!error && data) {
-            albumData = data;
+            albumData = deserializeAlbumFromSupabase(data);
           }
         }
       }
@@ -320,7 +391,7 @@ async function startServer() {
             .eq("id", id)
             .single();
           if (!error && data) {
-            albumData = data;
+            albumData = deserializeAlbumFromSupabase(data);
           }
         }
       }
@@ -376,7 +447,7 @@ async function startServer() {
             .eq("id", id)
             .single();
           if (!error && data) {
-            albumData = data;
+            albumData = deserializeAlbumFromSupabase(data);
           }
         }
       }
@@ -441,27 +512,20 @@ async function startServer() {
       const supabaseClient = getSupabaseClient();
       if (supabaseClient) {
         try {
-          const dbPayload = {
-            title: albumData.title,
-            template: albumData.template,
-            audio_url: albumData.audio_url,
-            cover_url: albumData.cover_url,
-            orientation: albumData.orientation,
-            page_marking: albumData.page_marking,
-            spreads: albumData.spreads
-          };
+          const dbPayload = serializeAlbumForSupabase(albumData);
           
           // If the original id is a valid uuid, we can update or insert with it
           const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
           if (isValidUUID) {
-            await supabaseClient.from("albums").upsert({ id, ...dbPayload });
+            await supabaseClient.from("albums").upsert(dbPayload);
           } else {
             // Try to upsert the custom text ID directly (in case they updated the table schema in Supabase SQL editor)
-            const { error: textUpsertError } = await supabaseClient.from("albums").upsert({ id, ...dbPayload });
+            const { error: textUpsertError } = await supabaseClient.from("albums").upsert(dbPayload);
             if (textUpsertError) {
               console.log("Supabase direct custom ID upsert failed (likely uuid type column), falling back to letting Supabase generate a UUID:", textUpsertError.message);
               // Fallback: Let Supabase auto-generate its own UUID
-              const { data, error } = await supabaseClient.from("albums").insert([dbPayload]).select("id").single();
+              const { id: dummyId, ...restPayload } = dbPayload;
+              const { data, error } = await supabaseClient.from("albums").insert([restPayload]).select("id").single();
               if (data && !error) {
                 const newId = data.id;
                 const newFilePath = path.join(albumsDir, `${newId}.json`);
