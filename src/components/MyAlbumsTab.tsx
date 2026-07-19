@@ -48,6 +48,9 @@ export default function MyAlbumsTab({
   
   // QR Code Modal State
   const [qrModalAlbum, setQrModalAlbum] = useState<Album | null>(null);
+  
+  // Deleting State (safe iframe fallback instead of window.confirm)
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Filter & Search Logic
   const filteredAlbums = albums.filter((album) => {
@@ -407,18 +410,36 @@ export default function MyAlbumsTab({
                           <Edit3 className="w-4 h-4" />
                         </button>
 
-                        {/* Delete */}
-                        <button
-                          onClick={() => {
-                            if (confirm(`Are you sure you want to delete "${album.client_name || album.title}"? This cannot be undone.`)) {
-                              onDeleteAlbum(album.id);
-                            }
-                          }}
-                          className="p-1.5 hover:bg-rose-500/10 text-zinc-500 hover:text-rose-400 rounded-lg transition-colors"
-                          title="Delete Album"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* Delete with safe iframe-compatible confirmation */}
+                        {deletingId === album.id ? (
+                          <div className="flex items-center gap-1.5 animate-fade-in pl-1 bg-[#1a1a1e] rounded-lg border border-rose-500/30 p-1">
+                            <button
+                              onClick={() => {
+                                onDeleteAlbum(album.id);
+                                setDeletingId(null);
+                              }}
+                              className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold transition-colors"
+                              title="Confirm Delete"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => setDeletingId(null)}
+                              className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-medium transition-colors"
+                              title="Cancel"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeletingId(album.id)}
+                            className="p-1.5 hover:bg-rose-500/10 text-zinc-500 hover:text-rose-400 rounded-lg transition-colors"
+                            title="Delete Album"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -445,34 +466,55 @@ export default function MyAlbumsTab({
                 )}
                 
                 {/* Overlay actions on hover */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                  <a
-                    href={`/album/${album.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-2.5 bg-zinc-900 border border-zinc-700/80 hover:bg-black rounded-xl text-white transition-all transform translate-y-2 group-hover:translate-y-0"
-                    title="View Album"
-                  >
-                    <Eye className="w-4.5 h-4.5" />
-                  </a>
-                  <button
-                    onClick={() => onEditAlbum(album)}
-                    className="p-2.5 bg-amber-500 text-black hover:bg-amber-400 rounded-xl font-bold transition-all transform translate-y-2 group-hover:translate-y-0"
-                    title="Edit Album"
-                  >
-                    <Edit3 className="w-4.5 h-4.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete "${album.client_name || album.title}"?`)) {
-                        onDeleteAlbum(album.id);
-                      }
-                    }}
-                    className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-xl transition-all transform translate-y-2 group-hover:translate-y-0"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4.5 h-4.5" />
-                  </button>
+                <div className={`absolute inset-0 bg-black/70 flex items-center justify-center gap-3 transition-opacity duration-300 ${deletingId === album.id ? 'opacity-100 z-10' : 'opacity-0 group-hover:opacity-100'}`}>
+                  {deletingId === album.id ? (
+                    <div className="flex flex-col items-center gap-2 p-2.5 bg-zinc-950/95 rounded-2xl border border-rose-500/40 shadow-2xl max-w-[90%] mx-auto animate-fade-in">
+                      <span className="text-[10px] font-bold text-rose-400 tracking-widest uppercase">Delete Album?</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            onDeleteAlbum(album.id);
+                            setDeletingId(null);
+                          }}
+                          className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs transition-colors"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setDeletingId(null)}
+                          className="px-2.5 py-1.5 bg-[#121214] border border-zinc-800 text-zinc-300 font-semibold rounded-lg text-xs hover:bg-zinc-900 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <a
+                        href={`/album/${album.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2.5 bg-zinc-900 border border-zinc-700/80 hover:bg-black rounded-xl text-white transition-all transform translate-y-2 group-hover:translate-y-0"
+                        title="View Album"
+                      >
+                        <Eye className="w-4.5 h-4.5" />
+                      </a>
+                      <button
+                        onClick={() => onEditAlbum(album)}
+                        className="p-2.5 bg-amber-500 text-black hover:bg-amber-400 rounded-xl font-bold transition-all transform translate-y-2 group-hover:translate-y-0"
+                        title="Edit Album"
+                      >
+                        <Edit3 className="w-4.5 h-4.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingId(album.id)}
+                        className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-xl transition-all transform translate-y-2 group-hover:translate-y-0"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4.5 h-4.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {/* Badges on Thumbnail */}

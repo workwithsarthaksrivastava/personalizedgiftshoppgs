@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Zap, 
   Wallet, 
@@ -18,16 +18,117 @@ import {
   Lock,
   Compass,
   Smile,
-  PhoneCall
+  PhoneCall,
+  RefreshCw,
+  Database,
+  Cloud,
+  Layers,
+  Image,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '../supabase';
 
 /* ========================================================
    DASHBOARD TAB OVERVIEW
    ======================================================== */
 export function DashboardOverviewTab({ onNavigateTab, totalAlbums = 0 }: { onNavigateTab: (tab: string) => void, totalAlbums?: number }) {
+  const [loading, setLoading] = useState(false);
+  const [statsData, setStatsData] = useState({
+    totalOnlineAlbums: 0,
+    totalOnlineImages: 0,
+    totalOnlineSpreads: 0,
+    albumsCreatedToday: 0,
+    imagesUploadedToday: 0,
+    lastSynced: ''
+  });
+
+  const syncData = async (showToast = false) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('albums')
+        .select('*');
+
+      if (error) {
+        throw error;
+      }
+
+      const todayStr = new Date().toDateString();
+      let totalOnlineAlbums = 0;
+      let totalOnlineImages = 0;
+      let totalOnlineSpreads = 0;
+      let albumsCreatedToday = 0;
+      let imagesUploadedToday = 0;
+
+      const fetchedList = data || [];
+      fetchedList.forEach((album: any) => {
+        totalOnlineAlbums++;
+        const spreads = album.spreads || [];
+        const spreadsCount = spreads.length || 0;
+        totalOnlineSpreads += spreadsCount;
+
+        let imgCountInAlbum = 0;
+        if (album.cover_url) imgCountInAlbum++;
+        if (album.back_cover_url) imgCountInAlbum++;
+        if (album.inner_front_url) imgCountInAlbum++;
+        if (album.inner_back_url) imgCountInAlbum++;
+
+        if (Array.isArray(spreads)) {
+          spreads.forEach((spread: any) => {
+            if (spread.leftImage) imgCountInAlbum++;
+            if (spread.rightImage) imgCountInAlbum++;
+          });
+        }
+
+        totalOnlineImages += imgCountInAlbum;
+
+        if (album.created_at) {
+          const albumDate = new Date(album.created_at);
+          if (albumDate.toDateString() === todayStr) {
+            albumsCreatedToday++;
+            imagesUploadedToday += imgCountInAlbum;
+          }
+        }
+      });
+
+      setStatsData({
+        totalOnlineAlbums,
+        totalOnlineImages,
+        totalOnlineSpreads,
+        albumsCreatedToday,
+        imagesUploadedToday,
+        lastSynced: new Date().toLocaleTimeString()
+      });
+
+      if (showToast) {
+        toast.success(`✨ Dashboard synced! ${totalOnlineAlbums} live albums calculated.`);
+      }
+    } catch (err: any) {
+      console.error('Error syncing with Supabase:', err);
+      if (showToast) {
+        toast.error('Sync failed: ' + (err.message || 'Unknown error'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    syncData();
+  }, []);
+
+  const ALBUM_LIMIT = 5;
+  const IMAGE_LIMIT = 50;
+
+  const albumsRemaining = Math.max(0, ALBUM_LIMIT - statsData.albumsCreatedToday);
+  const imagesRemaining = Math.max(0, IMAGE_LIMIT - statsData.imagesUploadedToday);
+
+  const albumProgressPercent = Math.min(100, (statsData.albumsCreatedToday / ALBUM_LIMIT) * 100);
+  const imageProgressPercent = Math.min(100, (statsData.imagesUploadedToday / IMAGE_LIMIT) * 100);
+
   const stats = [
-    { label: 'Total Albums', value: totalAlbums, desc: 'Your active published books', color: 'text-amber-500' },
+    { label: 'Total Albums', value: statsData.totalOnlineAlbums || totalAlbums, desc: 'Your active published books', color: 'text-amber-500' },
     { label: 'Design Presets', value: '6', desc: 'Custom premium design themes', color: 'text-indigo-500' },
     { label: 'Audio Library', value: '5', desc: 'Preloaded instrumental soundtracks', color: 'text-emerald-500' },
     { label: 'Server Status', value: 'ONLINE', desc: 'Cloud CDN delivery active', color: 'text-teal-500' }
@@ -77,6 +178,139 @@ export function DashboardOverviewTab({ onNavigateTab, totalAlbums = 0 }: { onNav
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Supabase Live Upload Sync & Daily Limits */}
+      <div className="bg-[#121214] border border-[#1e1e21] rounded-3xl p-6 shadow-xl space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1a1a1c] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl border border-amber-500/20">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-zinc-100 flex items-center gap-2">
+                Supabase Live Database & Daily Limits
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10b981] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10b981]"></span>
+                </span>
+              </h3>
+              <p className="text-[11px] text-zinc-500">Synchronized storage statistics and image limits for today</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {statsData.lastSynced && (
+              <span className="text-[10px] text-zinc-500 font-mono">Last synced: {statsData.lastSynced}</span>
+            )}
+            <button
+              onClick={() => syncData(true)}
+              disabled={loading}
+              className={`px-3 py-1.5 bg-zinc-950 border border-zinc-850 hover:bg-zinc-900 rounded-xl text-zinc-300 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 text-xs font-bold ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-amber-500 ${loading ? 'animate-spin' : ''}`} />
+              Sync Now
+            </button>
+          </div>
+        </div>
+
+        {/* Limits Progress Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Album creation limits */}
+          <div className="bg-zinc-950/40 border border-zinc-900/60 rounded-2xl p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wide font-mono block">Daily Album Saves</span>
+                <span className="text-2xl font-black text-amber-500">{statsData.albumsCreatedToday} <span className="text-xs font-medium text-zinc-500 font-sans">of {ALBUM_LIMIT} used</span></span>
+              </div>
+              <span className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-500 px-2.5 py-1 rounded-full font-bold">
+                {albumsRemaining} left today
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-[#18181b] h-2.5 rounded-full overflow-hidden border border-zinc-900">
+                <div 
+                  className="bg-amber-500 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                  style={{ width: `${albumProgressPercent}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-zinc-500 font-medium">
+                <span>0%</span>
+                <span>{albumProgressPercent.toFixed(0)}% used</span>
+                <span>100%</span>
+              </div>
+            </div>
+
+            {albumsRemaining === 0 && (
+              <div className="flex items-center gap-2 p-3 bg-rose-500/5 border border-rose-500/20 rounded-xl text-[11px] text-rose-400">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                <span>Daily album creation limit reached! It resets at midnight.</span>
+              </div>
+            )}
+          </div>
+
+          {/* Image upload limits */}
+          <div className="bg-zinc-950/40 border border-zinc-900/60 rounded-2xl p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wide font-mono block">Daily Image Uploads</span>
+                <span className="text-2xl font-black text-amber-500">{statsData.imagesUploadedToday} <span className="text-xs font-medium text-zinc-500 font-sans">of {IMAGE_LIMIT} used</span></span>
+              </div>
+              <span className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-500 px-2.5 py-1 rounded-full font-bold">
+                {imagesRemaining} left today
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-[#18181b] h-2.5 rounded-full overflow-hidden border border-zinc-900">
+                <div 
+                  className="bg-amber-500 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                  style={{ width: `${imageProgressPercent}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-zinc-500 font-medium">
+                <span>0%</span>
+                <span>{imageProgressPercent.toFixed(0)}% used</span>
+                <span>100%</span>
+              </div>
+            </div>
+
+            {imagesRemaining === 0 && (
+              <div className="flex items-center gap-2 p-3 bg-rose-500/5 border border-rose-500/20 rounded-xl text-[11px] text-rose-400">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                <span>Daily image limit reached! It resets at midnight.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Database Upload Totals Summary Footer */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-[#1a1a1c]/60">
+          <div className="flex items-center gap-3 p-3 bg-[#0a0a0c] border border-zinc-900 rounded-xl">
+            <Database className="w-4 h-4 text-amber-500 shrink-0" />
+            <div>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wide font-bold font-mono block">Supabase Albums</span>
+              <span className="text-sm font-extrabold text-white">{statsData.totalOnlineAlbums} online</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-[#0a0a0c] border border-zinc-900 rounded-xl">
+            <Layers className="w-4 h-4 text-indigo-400 shrink-0" />
+            <div>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wide font-bold font-mono block">Designed Spreads</span>
+              <span className="text-sm font-extrabold text-white">{statsData.totalOnlineSpreads} spreads</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-[#0a0a0c] border border-zinc-900 rounded-xl">
+            <Image className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wide font-bold font-mono block">Total Photos Hosted</span>
+              <span className="text-sm font-extrabold text-white">{statsData.totalOnlineImages} images</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Quick Launch & Activity */}

@@ -141,7 +141,18 @@ export default function Home() {
     try {
       setLoadingRecommendations(true);
       const stored = localStorage.getItem('recent_searches');
-      const searches: string[] = stored ? JSON.parse(stored) : [];
+      let searches: string[] = [];
+      try {
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          searches = Array.isArray(parsed) ? parsed : [];
+        }
+      } catch (e) {
+        console.warn('Error parsing recent_searches from localStorage:', e);
+        if (stored) {
+          searches = [stored];
+        }
+      }
       setSearchTerms(searches);
 
       const { data, error } = await supabase.from('products').select('*');
@@ -160,7 +171,7 @@ export default function Home() {
         ];
       }
 
-      const mainProducts = allProducts.filter((p: any) => p.category !== '_SUBSECTION_' && !p.category.startsWith('_SLIDESHOW_'));
+      const mainProducts = allProducts.filter((p: any) => p.category && p.category !== '_SUBSECTION_' && !p.category.startsWith('_SLIDESHOW_'));
 
       if (searches.length > 0) {
         const matched: any[] = [];

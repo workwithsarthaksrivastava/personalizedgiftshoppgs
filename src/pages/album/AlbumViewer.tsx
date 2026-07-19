@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../supabase';
@@ -21,18 +21,50 @@ const getThemeStyles = (template: string) => {
 const CoverPage = ({ album, theme }: { album: any, theme: any }) => (
   <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
     <div className="absolute inset-0 bg-black/40 z-10" />
-    {album.cover_url && <img src={album.cover_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="Cover" referrerPolicy="no-referrer" />}
+    {album.cover_url && <img src={album.cover_url} className="absolute inset-0 w-full h-full object-contain opacity-70 z-0" alt="Cover" referrerPolicy="no-referrer" />}
     <div className="relative z-20 text-center space-y-2 sm:space-y-4 bg-black/60 p-4 sm:p-8 rounded-xl backdrop-blur-md border border-white/10 shadow-2xl w-11/12 sm:w-5/6 max-w-md">
       <h1 className="text-xl sm:text-2xl md:text-4xl font-bold drop-shadow-lg" style={{ color: theme.title }}>{album.title}</h1>
+      {album.studio_name && (
+        <p className="text-[10px] sm:text-xs text-white/70 tracking-wider uppercase pt-2 border-t border-white/10">
+          Presented by {album.studio_name}
+        </p>
+      )}
     </div>
   </div>
 );
 
 const BackCover = ({ album, theme }: { album: any, theme: any }) => (
-  <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
-    <div className="text-center space-y-2 sm:space-y-4 p-4 sm:p-8 border border-white/5 rounded-xl bg-black/20">
-      <h2 className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: theme.title }}>The End</h2>
-      <p className="text-white/50 text-[8px] sm:text-[10px] tracking-widest uppercase">Created with Surya Films</p>
+  <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 relative shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] overflow-hidden" style={{ backgroundColor: theme.coverBg }}>
+    {album.back_cover_url && <img src={album.back_cover_url} className="absolute inset-0 w-full h-full object-contain opacity-40 z-0" alt="Back Cover" referrerPolicy="no-referrer" />}
+    <div className="absolute inset-0 bg-black/50 z-10" />
+    
+    <div className="relative z-20 text-center space-y-4 p-6 sm:p-8 border border-white/10 rounded-2xl bg-black/60 backdrop-blur-md max-w-sm w-11/12">
+      <h2 className="text-xl sm:text-2xl font-bold" style={{ color: theme.title }}>The End</h2>
+      
+      {(album.studio_name || album.photographer_name || album.mobile_number) ? (
+        <div className="space-y-2.5 pt-3 border-t border-white/10 text-left text-xs text-white/85">
+          {album.studio_name && (
+            <div>
+              <span className="text-white/40 block text-[9px] uppercase tracking-wider font-mono">Studio</span>
+              <span className="font-bold text-amber-400">{album.studio_name}</span>
+            </div>
+          )}
+          {album.photographer_name && (
+            <div>
+              <span className="text-white/40 block text-[9px] uppercase tracking-wider font-mono">Photographer</span>
+              <span className="font-semibold text-white/95">{album.photographer_name}</span>
+            </div>
+          )}
+          {album.mobile_number && (
+            <div>
+              <span className="text-white/40 block text-[9px] uppercase tracking-wider font-mono">Contact Info</span>
+              <span className="font-mono text-white/95">{album.mobile_number}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-white/50 text-[8px] sm:text-[10px] tracking-widest uppercase pt-2 border-t border-white/10">Created with PGS Album</p>
+      )}
     </div>
   </div>
 );
@@ -146,11 +178,10 @@ const AlbumPage = ({
   );
 };
 
-import { useLocation } from 'react-router-dom';
-
 export default function AlbumViewer() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [album, setAlbum] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -168,7 +199,13 @@ export default function AlbumViewer() {
     ? `https://personalizedgiftshop.in/album/${albumIdForShare}`
     : '';
 
-  const aspectClass = album ? (album.orientation === 'Portrait' ? 'aspect-[3/2]' : 'aspect-[8/3]') : 'aspect-[8/3]';
+  const aspectClass = album 
+    ? (album.orientation === 'Portrait' 
+        ? 'aspect-[3/2]' 
+        : album.orientation === 'Square'
+          ? 'aspect-[2/1]'
+          : 'aspect-[3/1]') 
+    : 'aspect-[3/1]';
 
   const sheets: any[] = [];
   if (album) {
@@ -389,9 +426,19 @@ export default function AlbumViewer() {
       {/* Floating Controls */}
       <div className="fixed top-6 left-6 right-6 flex items-center justify-between z-50 pointer-events-none">
         <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 pointer-events-auto">
-          <a href="https://personalizedgiftshop.in" className="text-white/70 hover:text-white transition-colors text-sm font-medium flex items-center gap-2">
-            <Home className="w-4 h-4" /> Home
-          </a>
+          <button 
+            onClick={() => {
+              // Try to go back in history, or fallback to the studio
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/create-album');
+              }
+            }}
+            className="text-white/70 hover:text-white transition-colors text-sm font-medium flex items-center gap-2 cursor-pointer bg-transparent border-none outline-none"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back to Studio
+          </button>
         </div>
         <div className="flex items-center gap-3 pointer-events-auto">
           {album.audio_url && (

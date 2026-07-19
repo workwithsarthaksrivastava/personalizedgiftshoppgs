@@ -62,6 +62,18 @@ const preloadedAudioTracks = [
   { id: 'smooth-piano', name: 'Ethereal Grand Piano (Modern Sophistication)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' }
 ];
 
+const getSinglePageAspectClass = (orientation?: string) => {
+  if (orientation === 'Portrait') return 'aspect-[3/4]';
+  if (orientation === 'Square') return 'aspect-square';
+  return 'aspect-[3/2]'; // Landscape matches 12x18 split sheets exactly (18:12 = 3:2)
+};
+
+const getSpreadAspectClass = (orientation?: string) => {
+  if (orientation === 'Portrait') return 'aspect-[3/2]'; // Two Portrait pages (3/4 * 2 = 1.5)
+  if (orientation === 'Square') return 'aspect-[2/1]'; // Two Square pages (1/1 * 2 = 2)
+  return 'aspect-[3/1]'; // Landscape matches 12x36 full sheets exactly (36:12 = 3:1)
+};
+
 interface CreateAlbumTabProps {
   album: Album;
   setAlbum: React.Dispatch<React.SetStateAction<Album>>;
@@ -86,6 +98,7 @@ export default function CreateAlbumTab({
   const audioInputRef = useRef<HTMLInputElement>(null);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const canvasMultiInputRef = useRef<HTMLInputElement>(null);
+  const sheet12x36InputRef = useRef<HTMLInputElement>(null);
 
   const currentUploadTarget = useRef<{
     type: 'cover' | 'back_cover' | 'inner_front' | 'inner_back' | 'combined_inner' | 'left' | 'right' | 'canvas',
@@ -155,6 +168,107 @@ export default function CreateAlbumTab({
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  // Check if uploaded image is a wide 12x36 layout sheet (width is >= 2.0x of height)
+  const checkIsWideImage = (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.width / img.height;
+          resolve(ratio >= 1.95); // Safely detect roughly 2:1 or 3:1 aspects (like 12x36 which is 3.0)
+        };
+        img.onerror = () => resolve(false);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(false);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Slices a 12x36 landscape sheet at the middle (18 mark) to create Left and Right flippable 12x18 pages
+  const split12x36Image = (file: File): Promise<{ left: string; right: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const originalWidth = img.width;
+          const originalHeight = img.height;
+          const halfWidth = Math.floor(originalWidth / 2);
+
+          // We resize each 12x18 split page to a maximum of 900px wide for high-fidelity rendering & optimized speed
+          const targetWidth = 900;
+          const targetHeight = Math.floor((originalHeight / halfWidth) * targetWidth);
+
+          // Left canvas
+          const leftCanvas = document.createElement('canvas');
+          leftCanvas.width = targetWidth;
+          leftCanvas.height = targetHeight;
+          const leftCtx = leftCanvas.getContext('2d');
+          if (leftCtx) {
+            leftCtx.drawImage(img, 0, 0, halfWidth, originalHeight, 0, 0, targetWidth, targetHeight);
+          }
+
+          // Right canvas
+          const rightCanvas = document.createElement('canvas');
+          rightCanvas.width = targetWidth;
+          rightCanvas.height = targetHeight;
+          const rightCtx = rightCanvas.getContext('2d');
+          if (rightCtx) {
+            rightCtx.drawImage(img, halfWidth, 0, originalWidth - halfWidth, originalHeight, 0, 0, targetWidth, targetHeight);
+          }
+
+          resolve({
+            left: leftCanvas.toDataURL('image/jpeg', 0.85),
+            right: rightCanvas.toDataURL('image/jpeg', 0.85)
+          });
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handle12x36Upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    toast.info(`Slicing ${files.length} wide 12x36 sheets down the middle (18" width mark)...`);
+    const newSpreads = [...album.spreads];
+
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const splitResult = await split12x36Image(files[i]);
+        const isFirstAndEmpty = newSpreads.length === 1 && !newSpreads[0].leftImage && !newSpreads[0].rightImage;
+
+        const newSpread: Spread = {
+          id: 'spread_36_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 5),
+          leftImage: splitResult.left,
+          rightImage: splitResult.right,
+          leftPageType: 'single',
+          rightPageType: 'single',
+          leftCanvasImages: [],
+          rightCanvasImages: []
+        };
+
+        if (isFirstAndEmpty) {
+          newSpreads[0] = newSpread;
+        } else {
+          newSpreads.push(newSpread);
+        }
+      } catch (err: any) {
+        console.error(err);
+        toast.error(`Failed to process 12x36 sheet: ${files[i].name}`);
+      }
+    }
+
+    setAlbum(prev => ({ ...prev, spreads: newSpreads }));
+    toast.success(`Successfully cut and added ${files.length} 12x36 sheets into flippable spreads!`);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,50 +388,83 @@ export default function CreateAlbumTab({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    toast.info(`Processing ${files.length} images...`);
-    const resizedUrls: string[] = [];
-    for (let i = 0; i < files.length; i++) {
-      try {
-        const url = await resizeImage(files[i]);
-        resizedUrls.push(url);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    if (resizedUrls.length === 0) {
-      toast.error('Could not process any of the images.');
-      return;
-    }
-
+    toast.info(`Processing ${files.length} image(s)...`);
     const newSpreads = [...album.spreads];
-    let currentIdx = 0;
+    
+    let normalImagesAdded = 0;
+    let wideSheetsAdded = 0;
 
-    for (let i = 0; i < newSpreads.length && currentIdx < resizedUrls.length; i++) {
-      if (!newSpreads[i].leftImage && (!newSpreads[i].leftPageType || newSpreads[i].leftPageType === 'single')) {
-        newSpreads[i].leftImage = resizedUrls[currentIdx++];
-      }
-      if (currentIdx < resizedUrls.length && !newSpreads[i].rightImage && (!newSpreads[i].rightPageType || newSpreads[i].rightPageType === 'single')) {
-        newSpreads[i].rightImage = resizedUrls[currentIdx++];
-      }
-    }
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const isWide = await checkIsWideImage(file);
+        if (isWide) {
+          const splitResult = await split12x36Image(file);
+          const isFirstAndEmpty = newSpreads.length === 1 && !newSpreads[0].leftImage && !newSpreads[0].rightImage;
+          const newSpread: Spread = {
+            id: 'spread_36_auto_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 5),
+            leftImage: splitResult.left,
+            rightImage: splitResult.right,
+            leftPageType: 'single',
+            rightPageType: 'single',
+            leftCanvasImages: [],
+            rightCanvasImages: []
+          };
+          if (isFirstAndEmpty) {
+            newSpreads[0] = newSpread;
+          } else {
+            newSpreads.push(newSpread);
+          }
+          wideSheetsAdded++;
+        } else {
+          // Regular single image
+          const base64Str = await resizeImage(file);
+          // Try to fit in an existing empty page slot
+          let placed = false;
+          for (let sIdx = 0; sIdx < newSpreads.length; sIdx++) {
+            if (!newSpreads[sIdx].leftImage && (!newSpreads[sIdx].leftPageType || newSpreads[sIdx].leftPageType === 'single')) {
+              newSpreads[sIdx].leftImage = base64Str;
+              placed = true;
+              break;
+            }
+            if (!newSpreads[sIdx].rightImage && (!newSpreads[sIdx].rightPageType || newSpreads[sIdx].rightPageType === 'single')) {
+              newSpreads[sIdx].rightImage = base64Str;
+              placed = true;
+              break;
+            }
+          }
 
-    while (currentIdx < resizedUrls.length) {
-      const left = resizedUrls[currentIdx++];
-      const right = currentIdx < resizedUrls.length ? resizedUrls[currentIdx++] : '';
-      newSpreads.push({
-        id: Date.now() + currentIdx,
-        leftImage: left,
-        rightImage: right,
-        leftPageType: 'single',
-        rightPageType: 'single',
-        leftCanvasImages: [],
-        rightCanvasImages: []
-      });
+          if (!placed) {
+            // Create a new spread
+            newSpreads.push({
+              id: 'spread_auto_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 5),
+              leftImage: base64Str,
+              rightImage: '',
+              leftPageType: 'single',
+              rightPageType: 'single',
+              leftCanvasImages: [],
+              rightCanvasImages: []
+            });
+          }
+          normalImagesAdded++;
+        }
+      } catch (err) {
+        console.error("Error processing file:", file.name, err);
+        toast.error(`Error processing file: ${file.name}`);
+      }
     }
 
     setAlbum(prev => ({ ...prev, spreads: newSpreads }));
-    toast.success(`Successfully uploaded and added ${resizedUrls.length} inner pages!`);
+    
+    let summaryText = `Successfully processed images!`;
+    if (wideSheetsAdded > 0 && normalImagesAdded > 0) {
+      summaryText = `Added ${wideSheetsAdded} wide 12x36 sheet(s) (auto-split) and ${normalImagesAdded} regular page(s)!`;
+    } else if (wideSheetsAdded > 0) {
+      summaryText = `Successfully auto-split and added ${wideSheetsAdded} wide 12x36 sheet(s)!`;
+    } else if (normalImagesAdded > 0) {
+      summaryText = `Successfully added ${normalImagesAdded} inner page(s)!`;
+    }
+    toast.success(summaryText);
   };
 
   const triggerCanvasMultiUpload = (spreadId: number | string, page: 'left' | 'right') => {
@@ -613,6 +760,7 @@ export default function CreateAlbumTab({
       <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioUpload} />
       <input type="file" ref={multiFileInputRef} className="hidden" accept="image/*" multiple onChange={handleMultiFileUpload} />
       <input type="file" ref={canvasMultiInputRef} className="hidden" accept="image/*" multiple onChange={handleCanvasMultiUpload} />
+      <input type="file" ref={sheet12x36InputRef} className="hidden" accept="image/*" multiple onChange={handle12x36Upload} />
 
       {/* Editor top controls bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121214] border border-[#1e1e21] p-4 rounded-2xl shadow-xl">
@@ -791,6 +939,46 @@ export default function CreateAlbumTab({
               <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             </div>
           </div>
+
+          {/* Studio & Photographer Branding */}
+          <div className="space-y-4 pt-4 border-t border-zinc-900">
+            <h4 className="text-xs font-bold text-amber-500 uppercase tracking-wider font-mono">Branding &amp; Contact (Optional)</h4>
+            
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-zinc-400">Studio Name</label>
+              <input
+                type="text"
+                placeholder="e.g. Surya Films Studio"
+                value={album.studio_name || ''}
+                onChange={(e) => setAlbum(prev => ({ ...prev, studio_name: e.target.value }))}
+                className="w-full px-3.5 py-2.5 bg-[#09090b] border border-zinc-800 rounded-xl focus:border-amber-500/50 outline-none text-sm text-zinc-100 placeholder-zinc-800 transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-400">Photographer</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rajesh Kumar"
+                  value={album.photographer_name || ''}
+                  onChange={(e) => setAlbum(prev => ({ ...prev, photographer_name: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#09090b] border border-zinc-800 rounded-xl focus:border-amber-500/50 outline-none text-sm text-zinc-100 placeholder-zinc-800 transition-colors"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-400">Mobile Number</label>
+                <input
+                  type="tel"
+                  placeholder="e.g. +91 98765 43210"
+                  value={album.mobile_number || ''}
+                  onChange={(e) => setAlbum(prev => ({ ...prev, mobile_number: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#09090b] border border-zinc-800 rounded-xl focus:border-amber-500/50 outline-none text-sm text-zinc-100 placeholder-zinc-800 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right column: COVERS & CANVAS LAYOUTS */}
@@ -810,11 +998,11 @@ export default function CreateAlbumTab({
                 <label className="text-xs font-semibold text-zinc-400 block">Front Cover *</label>
                 <div 
                   onClick={() => triggerUpload('cover')}
-                  className="aspect-[4/3] bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative"
+                  className={`${getSinglePageAspectClass(album.orientation)} bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative`}
                 >
                   {album.cover_url ? (
                     <>
-                      <img src={album.cover_url} alt="Front Cover" className="w-full h-full object-cover group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
+                      <img src={album.cover_url} alt="Front Cover" className="w-full h-full object-contain group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
                       <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md hover:bg-black text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setAlbum(p => ({...p, cover_url: ''})); }}>
                         <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                       </div>
@@ -834,11 +1022,11 @@ export default function CreateAlbumTab({
                 <label className="text-xs font-semibold text-zinc-400 block">Back Cover *</label>
                 <div 
                   onClick={() => triggerUpload('back_cover')}
-                  className="aspect-[4/3] bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative"
+                  className={`${getSinglePageAspectClass(album.orientation)} bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative`}
                 >
                   {album.back_cover_url ? (
                     <>
-                      <img src={album.back_cover_url} alt="Back Cover" className="w-full h-full object-cover group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
+                      <img src={album.back_cover_url} alt="Back Cover" className="w-full h-full object-contain group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
                       <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md hover:bg-black text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setAlbum(p => ({...p, back_cover_url: ''})); }}>
                         <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                       </div>
@@ -888,11 +1076,11 @@ export default function CreateAlbumTab({
                   <label className="text-xs font-semibold text-zinc-400 block">Inner front (DM First)</label>
                   <div 
                     onClick={() => triggerUpload('inner_front')}
-                    className="aspect-[4/3] bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative"
+                    className={`${getSinglePageAspectClass(album.orientation)} bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative`}
                   >
                     {album.inner_front_url ? (
                       <>
-                        <img src={album.inner_front_url} alt="Inner Front" className="w-full h-full object-cover group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
+                        <img src={album.inner_front_url} alt="Inner Front" className="w-full h-full object-contain group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
                         <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md hover:bg-black text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setAlbum(p => ({...p, inner_front_url: ''})); }}>
                           <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                         </div>
@@ -911,11 +1099,11 @@ export default function CreateAlbumTab({
                   <label className="text-xs font-semibold text-zinc-400 block">Inner back (DM Last)</label>
                   <div 
                     onClick={() => triggerUpload('inner_back')}
-                    className="aspect-[4/3] bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative"
+                    className={`${getSinglePageAspectClass(album.orientation)} bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative`}
                   >
                     {album.inner_back_url ? (
                       <>
-                        <img src={album.inner_back_url} alt="Inner Back" className="w-full h-full object-cover group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
+                        <img src={album.inner_back_url} alt="Inner Back" className="w-full h-full object-contain group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
                         <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md hover:bg-black text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setAlbum(p => ({...p, inner_back_url: ''})); }}>
                           <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                         </div>
@@ -936,11 +1124,11 @@ export default function CreateAlbumTab({
                 <label className="text-xs font-semibold text-zinc-400 block">Combined Inner Spread (Front + Back)</label>
                 <div 
                   onClick={() => triggerUpload('combined_inner')}
-                  className="aspect-[8/3] bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative"
+                  className={`${getSpreadAspectClass(album.orientation)} bg-gradient-to-br from-zinc-900 to-zinc-950 border-2 border-dashed border-zinc-800 hover:border-amber-500/40 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative`}
                 >
                   {album.combined_inner_url ? (
                     <>
-                      <img src={album.combined_inner_url} alt="Combined Inner" className="w-full h-full object-cover group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
+                      <img src={album.combined_inner_url} alt="Combined Inner" className="w-full h-full object-contain group-hover:opacity-70 transition-opacity" referrerPolicy="no-referrer" />
                       <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md hover:bg-black text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setAlbum(p => ({...p, combined_inner_url: ''})); }}>
                         <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                       </div>
@@ -969,7 +1157,15 @@ export default function CreateAlbumTab({
             <p className="text-xs text-zinc-500 mt-1">Populate sheets with simple photos or customize rich canvas layouts with frames and margins</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => sheet12x36InputRef.current?.click()}
+              className="px-4 py-2 bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-amber-500 rounded-xl font-bold flex items-center gap-2 text-xs transition-colors"
+              title="Upload full-width 12x36 landscape sheets to be automatically split down the center (18 width) into a flippable book!"
+            >
+              <ArrowLeftRight className="w-4 h-4 text-amber-500 animate-pulse" /> Upload 12x36 Sheet(s)
+            </button>
             <button
               type="button"
               onClick={triggerMultiUpload}
@@ -1013,6 +1209,7 @@ export default function CreateAlbumTab({
               {/* Left and Right Page Editors */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 <PageEditor
+                  album={album}
                   spread={spread}
                   page="left"
                   triggerImageUpload={triggerUpload}
@@ -1029,6 +1226,7 @@ export default function CreateAlbumTab({
                   setAlbum={setAlbum}
                 />
                 <PageEditor
+                  album={album}
                   spread={spread}
                   page="right"
                   triggerImageUpload={triggerUpload}
@@ -1062,6 +1260,7 @@ export default function CreateAlbumTab({
 }
 
 const PageEditor = ({
+  album,
   spread,
   page,
   triggerImageUpload,
@@ -1077,6 +1276,7 @@ const PageEditor = ({
   handleStartRotate,
   setAlbum
 }: {
+  album: Album;
   spread: Spread;
   page: 'left' | 'right';
   triggerImageUpload: any;
@@ -1162,10 +1362,10 @@ const PageEditor = ({
       {!isCanvas ? (
         <div 
           onClick={() => triggerImageUpload(page, spread.id)}
-          className="aspect-[4/3] bg-zinc-950 rounded-xl border-2 border-dashed border-zinc-800 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden group relative"
+          className={`${getSinglePageAspectClass(album.orientation)} bg-zinc-950 rounded-xl border-2 border-dashed border-zinc-800 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden group relative`}
         >
           {singleImage ? (
-            <img src={singleImage} alt={page} className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" referrerPolicy="no-referrer" />
+            <img src={singleImage} alt={page} className="w-full h-full object-contain group-hover:opacity-75 transition-opacity" referrerPolicy="no-referrer" />
           ) : (
             <>
               <ImageIcon className="w-8 h-8 text-zinc-700 mb-2 group-hover:text-amber-500 transition-all" />
@@ -1177,7 +1377,7 @@ const PageEditor = ({
         <div className="space-y-4">
           <div 
             id={`canvas-${spread.id}-${page}`}
-            className="relative aspect-[4/3] w-full bg-[#08080a] border border-zinc-850 rounded-xl overflow-hidden shadow-inner select-none"
+            className={`relative ${getSinglePageAspectClass(album.orientation)} w-full bg-[#08080a] border border-zinc-850 rounded-xl overflow-hidden shadow-inner select-none`}
             style={{
               backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
               backgroundSize: '16px 16px'

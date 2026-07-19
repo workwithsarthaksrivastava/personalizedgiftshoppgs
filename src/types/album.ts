@@ -45,4 +45,7 @@ export interface Album {
   created_at?: string;
   status?: string;
   job_number?: string;
+  studio_name?: string;
+  photographer_name?: string;
+  mobile_number?: string;
 }
