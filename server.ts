@@ -241,35 +241,161 @@ async function startServer() {
     fs.mkdirSync(albumsDir, { recursive: true });
   }
 
-  // Get album by ID
+  // Get album by ID and increment views_count
   app.get("/api/albums/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const filePath = path.join(albumsDir, `${id}.json`);
+      let albumData: any = null;
+
       if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, "utf-8");
-        return res.json({ success: true, data: JSON.parse(fileContent) });
+        try {
+          const fileContent = fs.readFileSync(filePath, "utf-8");
+          albumData = JSON.parse(fileContent);
+        } catch (e) {
+          console.error("Error reading JSON file:", e);
+        }
       }
 
       // If not found in local file system, see if we can get it from Supabase
-      const supabaseClient = getSupabaseClient();
-      if (supabaseClient) {
-        const { data, error } = await supabaseClient
-          .from("albums")
-          .select("*")
-          .eq("id", id)
-          .single();
+      if (!albumData) {
+        const supabaseClient = getSupabaseClient();
+        if (supabaseClient) {
+          const { data, error } = await supabaseClient
+            .from("albums")
+            .select("*")
+            .eq("id", id)
+            .single();
 
-        if (error || !data) {
-          return res.status(404).json({ success: false, message: "Album not found in file system or database" });
+          if (!error && data) {
+            albumData = data;
+          }
         }
-        return res.json({ success: true, data });
-      } else {
+      }
+
+      if (!albumData) {
         return res.status(404).json({ success: false, message: "Album not found on server" });
       }
+
+      // Ensure stats fields exist
+      if (albumData.views_count === undefined) albumData.views_count = 0;
+      if (albumData.likes_count === undefined) albumData.likes_count = 0;
+      if (albumData.comments === undefined) albumData.comments = [];
+
+      // Increment views
+      albumData.views_count += 1;
+
+      // Save updated data to filesystem
+      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+
+      return res.json({ success: true, data: albumData });
     } catch (err: any) {
       console.error("Error reading album:", err);
       return res.status(500).json({ success: false, message: "Internal server error reading album", error: err.message });
+    }
+  });
+
+  // Update likes for an album
+  app.post("/api/albums/:id/like", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { action } = req.body; // 'like' or 'unlike'
+      const filePath = path.join(albumsDir, `${id}.json`);
+      let albumData: any = null;
+
+      if (fs.existsSync(filePath)) {
+        try {
+          albumData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+        } catch (e) {
+          console.error("Error reading JSON file:", e);
+        }
+      }
+
+      if (!albumData) {
+        const supabaseClient = getSupabaseClient();
+        if (supabaseClient) {
+          const { data, error } = await supabaseClient
+            .from("albums")
+            .select("*")
+            .eq("id", id)
+            .single();
+          if (!error && data) {
+            albumData = data;
+          }
+        }
+      }
+
+      if (!albumData) {
+        return res.status(404).json({ success: false, message: "Album not found to update likes" });
+      }
+
+      if (albumData.likes_count === undefined) albumData.likes_count = 0;
+      if (albumData.views_count === undefined) albumData.views_count = 0;
+      if (albumData.comments === undefined) albumData.comments = [];
+
+      if (action === 'like') {
+        albumData.likes_count += 1;
+      } else if (action === 'unlike') {
+        albumData.likes_count = Math.max(0, albumData.likes_count - 1);
+      }
+
+      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+      return res.json({ success: true, likes_count: albumData.likes_count });
+    } catch (err: any) {
+      console.error("Error updating likes:", err);
+      return res.status(500).json({ success: false, message: "Internal server error updating likes" });
+    }
+  });
+
+  // Add a comment to an album
+  app.post("/api/albums/:id/comment", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { comment } = req.body;
+      if (!comment || !comment.trim()) {
+        return res.status(400).json({ success: false, message: "Comment cannot be empty" });
+      }
+
+      const filePath = path.join(albumsDir, `${id}.json`);
+      let albumData: any = null;
+
+      if (fs.existsSync(filePath)) {
+        try {
+          albumData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+        } catch (e) {
+          console.error("Error reading JSON file:", e);
+        }
+      }
+
+      if (!albumData) {
+        const supabaseClient = getSupabaseClient();
+        if (supabaseClient) {
+          const { data, error } = await supabaseClient
+            .from("albums")
+            .select("*")
+            .eq("id", id)
+            .single();
+          if (!error && data) {
+            albumData = data;
+          }
+        }
+      }
+
+      if (!albumData) {
+        return res.status(404).json({ success: false, message: "Album not found to add comment" });
+      }
+
+      if (albumData.comments === undefined) albumData.comments = [];
+      if (albumData.views_count === undefined) albumData.views_count = 0;
+      if (albumData.likes_count === undefined) albumData.likes_count = 0;
+
+      albumData.comments.push(comment.trim());
+
+      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+      return res.json({ success: true, comments: albumData.comments });
+    } catch (err: any) {
+      console.error("Error adding comment:", err);
+      return res.status(500).json({ success: false, message: "Internal server error adding comment" });
     }
   });
 
@@ -284,13 +410,31 @@ async function startServer() {
         id = `album_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       }
 
+      // Preserve existing stats if already on server disk
+      let existingViews = 0;
+      let existingLikes = 0;
+      let existingComments: string[] = [];
+      const filePath = path.join(albumsDir, `${id}.json`);
+      if (fs.existsSync(filePath)) {
+        try {
+          const oldData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+          existingViews = oldData.views_count || 0;
+          existingLikes = oldData.likes_count || 0;
+          existingComments = oldData.comments || [];
+        } catch (e) {
+          console.warn("Failed to read old stats:", e);
+        }
+      }
+
       const albumData = {
         ...payload,
         id,
+        views_count: payload.views_count !== undefined ? payload.views_count : existingViews,
+        likes_count: payload.likes_count !== undefined ? payload.likes_count : existingLikes,
+        comments: payload.comments !== undefined ? payload.comments : existingComments,
         created_at: payload.created_at || new Date().toISOString()
       };
 
-      const filePath = path.join(albumsDir, `${id}.json`);
       fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
 
       // Also try to sync with Supabase if configured

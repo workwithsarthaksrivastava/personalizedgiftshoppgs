@@ -155,10 +155,18 @@ export default function Home() {
       }
       setSearchTerms(searches);
 
-      const { data, error } = await supabase.from('products').select('*');
-      if (error) throw error;
+      let allProducts = [];
+      try {
+        const { data, error } = await supabase.from('products').select('*');
+        if (error) {
+          console.warn('Supabase fetch failed in recommendations, using fallbacks:', error);
+        } else {
+          allProducts = data || [];
+        }
+      } catch (dbErr) {
+        console.warn('Database error in recommendations, using fallbacks:', dbErr);
+      }
 
-      let allProducts = data || [];
       if (allProducts.length === 0) {
         allProducts = [
           { id: '1', name: 'Acrylic Frame 8x12', category: 'Photo Frames', price: 525, image: '/frame_slide_1.png', description: 'Premium 2mm, 3mm, 5mm thickness acrylic frame.' },

@@ -52,13 +52,27 @@ const initialBlankAlbum = (): Album => ({
 
 export default function AlbumStudio() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<string>('my-albums');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return sessionStorage.getItem('studio_active_tab') || 'my-albums';
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   // Database of albums in state
   const [albums, setAlbums] = useState<Album[]>([]);
   // The active album that is loaded in the editor
-  const [activeAlbum, setActiveAlbum] = useState<Album>(initialBlankAlbum());
+  const [activeAlbum, setActiveAlbum] = useState<Album>(() => {
+    const saved = sessionStorage.getItem('studio_active_album');
+    return saved ? JSON.parse(saved) : initialBlankAlbum();
+  });
+
+  // Keep sessionStorage in sync with activeTab and activeAlbum
+  useEffect(() => {
+    sessionStorage.setItem('studio_active_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    sessionStorage.setItem('studio_active_album', JSON.stringify(activeAlbum));
+  }, [activeAlbum]);
 
   // Fetch albums from Supabase and integrate local storage / mocks
   const loadAlbums = async () => {
@@ -265,6 +279,7 @@ export default function AlbumStudio() {
 
       await loadAlbums();
       setActiveTab('my-albums');
+      setActiveAlbum(initialBlankAlbum());
     } catch (err) {
       console.error(err);
       toast.error('Error saving album. Please check image sizing is optimized.');
