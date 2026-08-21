@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, serializeAlbumForSupabase, deserializeAlbumFromSupabase } from '../../supabase';
+import { 
+  fetchAlbumsFromR2, 
+  saveAlbumToR2, 
+  deleteAlbumFromR2, 
+  sanitizeAndUploadAlbumAssetsToR2 
+} from '../../lib/r2Storage';
 import { toast } from 'sonner';
 import { Album, Spread } from '../../types/album';
 
@@ -74,18 +80,13 @@ export default function AlbumStudio() {
     sessionStorage.setItem('studio_active_album', JSON.stringify(activeAlbum));
   }, [activeAlbum]);
 
-  // Fetch albums from Supabase and integrate local storage / mocks
+  // Fetch albums from Cloudflare R2 / Server storage with Supabase & local fallback
   const loadAlbums = async () => {
     try {
-      const { data, error } = await supabase
-        .from('albums')
-        .select('*');
+      // 1. Fetch from Cloudflare R2 database
+      const r2Albums = await fetchAlbumsFromR2();
 
-      if (error) {
-        console.warn("Supabase fetch failed. Falling back to presets and local storage:", error);
-      }
-
-      // Read local storage ones too
+      // 2. Also read any local storage fallbacks
       const localAlbums: Album[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -99,21 +100,37 @@ export default function AlbumStudio() {
         }
       }
 
-      const fetchedList = (data || []).map(deserializeAlbumFromSupabase);
-      
-      // Combine all. Only real user albums!
-      let combined = [...fetchedList, ...localAlbums];
+      // 3. Fallback to Supabase if R2 is empty
+      let supabaseList: Album[] = [];
+      if (r2Albums.length === 0) {
+        try {
+          const { data } = await supabase.from('albums').select('*');
+          if (data && Array.isArray(data)) {
+            supabaseList = data.map(deserializeAlbumFromSupabase);
+          }
+        } catch (e) {
+          console.warn("Supabase fetch fallback skipped:", e);
+        }
+      }
 
-      // Sort by created date descending
+      // Combine unique albums by ID
+      const albumMap = new Map<string, Album>();
+      for (const alb of [...r2Albums, ...supabaseList, ...localAlbums]) {
+        if (alb && alb.id) {
+          albumMap.set(String(alb.id), alb);
+        }
+      }
+
+      const combined = Array.from(albumMap.values());
       combined.sort((a, b) => {
-        const dateA = new Date(a.created_at || '');
-        const dateB = new Date(b.created_at || '');
-        return dateB.getTime() - dateA.getTime();
+        const dateA = new Date(a.created_at || '').getTime();
+        const dateB = new Date(b.created_at || '').getTime();
+        return dateB - dateA;
       });
 
       setAlbums(combined);
     } catch (err) {
-      console.error(err);
+      console.error("Error in loadAlbums:", err);
       setAlbums([]);
     }
   };
@@ -138,22 +155,18 @@ export default function AlbumStudio() {
   // Action: Delete Album
   const handleDeleteAlbum = async (id: string) => {
     try {
-      // 1. Delete from Supabase if real
+      // 1. Delete from Cloudflare R2 / Server storage
+      await deleteAlbumFromR2(id);
+
+      // 2. Delete from Supabase if connected
       if (!id.startsWith('local_')) {
-        const { error } = await supabase
-          .from('albums')
-          .delete()
-          .eq('id', id);
-        if (error) console.warn(error);
+        try {
+          await supabase.from('albums').delete().eq('id', id);
+        } catch (err) {
+          console.warn("Supabase delete skipped:", err);
+        }
       } else {
         localStorage.removeItem('album_' + id);
-      }
-
-      // 2. Clear server-side filesystem sync (non-blocking)
-      try {
-        await fetch(`/album/api/albums?id=${id}`, { method: 'DELETE' });
-      } catch (err) {
-        console.warn("Local server sync deletion bypassed:", err);
       }
 
       setAlbums(prev => prev.filter(a => a.id !== id));
@@ -169,18 +182,19 @@ export default function AlbumStudio() {
     if (!album) return;
 
     const updatedPublic = album.is_public === false; // toggle
+    const updatedAlbum = { ...album, is_public: updatedPublic };
     
     // Update local state
-    setAlbums(prev => prev.map(a => a.id === id ? { ...a, is_public: updatedPublic } : a));
+    setAlbums(prev => prev.map(a => a.id === id ? updatedAlbum : a));
 
     try {
-      const updatedAlbum = { ...album, is_public: updatedPublic };
+      // Save to Cloudflare R2
+      await saveAlbumToR2(updatedAlbum);
+
+      // Supabase backup
       if (!id.startsWith('local_')) {
         const serialized = serializeAlbumForSupabase(updatedAlbum);
-        await supabase
-          .from('albums')
-          .update({ page_marking: serialized.page_marking })
-          .eq('id', id);
+        await supabase.from('albums').update({ page_marking: serialized.page_marking }).eq('id', id);
       } else {
         localStorage.setItem('album_' + id, JSON.stringify(updatedAlbum));
       }
@@ -207,16 +221,17 @@ export default function AlbumStudio() {
       updatedPin = pin.trim();
     }
 
-    setAlbums(prev => prev.map(a => a.id === id ? { ...a, view_lock_pin: updatedPin } : a));
+    const updatedAlbum = { ...album, view_lock_pin: updatedPin };
+    setAlbums(prev => prev.map(a => a.id === id ? updatedAlbum : a));
 
     try {
-      const updatedAlbum = { ...album, view_lock_pin: updatedPin };
+      // Save to Cloudflare R2
+      await saveAlbumToR2(updatedAlbum);
+
+      // Supabase backup
       if (!id.startsWith('local_')) {
         const serialized = serializeAlbumForSupabase(updatedAlbum);
-        await supabase
-          .from('albums')
-          .update({ page_marking: serialized.page_marking })
-          .eq('id', id);
+        await supabase.from('albums').update({ page_marking: serialized.page_marking }).eq('id', id);
       } else {
         localStorage.setItem('album_' + id, JSON.stringify(updatedAlbum));
       }
@@ -244,7 +259,6 @@ export default function AlbumStudio() {
     const randomCode = Math.floor(1000 + Math.random() * 9000);
     const finalId = activeAlbum.id ? activeAlbum.id : `${cleanedSlug}-${randomCode}`;
 
-    const isNewAlbum = !activeAlbum.id;
     const newAlbumPayload: Album = {
       ...activeAlbum,
       id: finalId,
@@ -254,56 +268,30 @@ export default function AlbumStudio() {
       created_at: activeAlbum.created_at || new Date().toISOString()
     };
 
-    const dbPayload = serializeAlbumForSupabase(newAlbumPayload);
-
     try {
-      // 1. Try saving directly to Supabase
-      console.log("Saving album to Supabase...", dbPayload);
-      
-      const query = isNewAlbum 
-        ? supabase.from('albums').insert([dbPayload]).select()
-        : supabase.from('albums').upsert(dbPayload).select();
+      // 1. Upload any base64 images directly to Cloudflare R2
+      toast.info('Publishing to Cloudflare R2 database...');
+      const uploadedAlbum = await sanitizeAndUploadAlbumAssetsToR2(newAlbumPayload);
 
-      const response = await query;
-      
-      // LOG SUPABASE RESPONSE EXACTLY AS REQUESTED
-      console.log("Supabase response:", { data: response.data, error: response.error });
+      // 2. Save complete album document to Cloudflare R2 database
+      const savedResult = await saveAlbumToR2(uploadedAlbum);
+      console.log("[Cloudflare R2 Database] Successfully published album:", savedResult.id);
+      toast.success('✨ Album published to Cloudflare R2 database!');
 
-      const dbError = response.error;
-
-      if (dbError) {
-        console.error("Supabase Save Error Details:", dbError);
-        toast.error(`Failed to publish online: ${dbError.message || 'Unknown database error'}`);
-        
-        // Fallback to local storage
-        try {
-          localStorage.setItem('album_local_' + finalId, JSON.stringify({ ...newAlbumPayload, id: 'local_' + finalId }));
-          toast.warning('Offline Save: Saved locally on this browser as a fallback. Share disabled.');
-        } catch (storageErr: any) {
-          console.error("Local storage fallback failed:", storageErr);
-          toast.error(`Local storage fallback also failed: ${storageErr.message || 'Storage limit exceeded'}`);
-        }
-      } else {
-        toast.success('✨ Album published online! Share link or stamp with your client.');
-      }
-
-      // 2. Synchronize to Node local disk API (non-blocking)
+      // 3. Optional background sync with Supabase for legacy mirroring
       try {
-        await fetch('/album/api/albums', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newAlbumPayload)
-        });
-      } catch (err) {
-        console.warn("Node local API sync bypassed:", err);
+        const dbPayload = serializeAlbumForSupabase(uploadedAlbum);
+        await supabase.from('albums').upsert(dbPayload);
+      } catch (dbErr) {
+        console.warn("Optional Supabase sync skipped:", dbErr);
       }
 
       await loadAlbums();
       setActiveTab('my-albums');
       setActiveAlbum(initialBlankAlbum());
     } catch (err: any) {
-      console.error(err);
-      toast.error(`Error saving album: ${err.message || 'Please check image sizing is optimized.'}`);
+      console.error("Save error:", err);
+      toast.error(`Error saving album: ${err.message || 'Please check connection'}`);
     } finally {
       setIsSaving(false);
     }

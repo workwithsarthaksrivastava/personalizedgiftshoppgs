@@ -7,7 +7,7 @@ import AppLayout from './AppLayout';
 const Home = lazy(() => import('./pages/Home'));
 const Products = lazy(() => import('./pages/Products'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
-const FrameStudio = lazy(() => import('./pages/FrameStudio'));
+const FrameStudioPage = lazy(() => import('./pages/FrameStudioPage'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Login = lazy(() => import('./pages/Login'));
 const Admin = lazy(() => import('./pages/Admin'));
@@ -41,7 +41,8 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/products" element={<Products />} />
-              <Route path="/frame-studio" element={<FrameStudio />} />
+              <Route path="/frame-studio" element={<FrameStudioPage />} />
+              <Route path="/frame-studio/:id" element={<FrameStudioPage />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />

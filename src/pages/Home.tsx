@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import Slideshow from '../components/Slideshow';
 import HeroProductSection from '../components/HeroProductSection';
 import { supabase } from '../supabase';
+import { fetchAllProductsCached } from '../lib/productsCache';
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -157,12 +158,8 @@ export default function Home() {
 
       let allProducts = [];
       try {
-        const { data, error } = await supabase.from('products').select('*');
-        if (error) {
-          console.warn('Supabase fetch failed in recommendations, using fallbacks:', error);
-        } else {
-          allProducts = data || [];
-        }
+        const data = await fetchAllProductsCached();
+        allProducts = data || [];
       } catch (dbErr) {
         console.warn('Database error in recommendations, using fallbacks:', dbErr);
       }

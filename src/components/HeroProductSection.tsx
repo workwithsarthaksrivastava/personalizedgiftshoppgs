@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { fetchAllProductsCached } from '../lib/productsCache';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
@@ -42,12 +43,7 @@ export default function HeroProductSection() {
   useEffect(() => {
     const fetchHeroProducts = async () => {
       try {
-        const { data, error } = await supabase.from('products').select('*');
-        if (error) {
-          console.warn("Supabase fetch returned error. Falling back to default premium heroes.", error.message);
-          setHeroProducts(getFallbackHeroes());
-          return;
-        }
+        const data = await fetchAllProductsCached();
         
         let foundHeroes: any[] = [];
         if (data && data.length > 0) {

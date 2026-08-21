@@ -8,6 +8,13 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
+import multer from "multer";
+import { readPsd } from "ag-psd";
+import { createCanvas } from "@napi-rs/canvas";
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } });
 
 let ai: GoogleGenAI | null = null;
 const getAiClient = () => {
@@ -29,37 +36,40 @@ const getAiClient = () => {
 };
 
 function serializeAlbumForSupabase(album: any): any {
-  const dbPayload = {
+  const dbPayload: any = {
     id: album.id,
-    title: album.title || '',
-    template: album.template || 'classic',
+    title: album.title || album.client_name || album.name || 'My Celebration Album',
+    template: album.template || 'Classic Royal',
     audio_url: album.audio_url || '',
     cover_url: album.cover_url || '',
-    orientation: album.orientation || 'landscape',
+    orientation: album.orientation || 'Landscape',
     spreads: album.spreads || [],
     created_at: album.created_at || new Date().toISOString()
   };
 
   const metadata = {
+    name: album.name || album.title,
+    title: album.title || album.name,
     audio_name: album.audio_name,
     back_cover_url: album.back_cover_url,
     inner_front_url: album.inner_front_url,
     inner_back_url: album.inner_back_url,
     combined_inner_url: album.combined_inner_url,
     is_combined_inner: album.is_combined_inner,
-    client_name: album.client_name,
-    function_name: album.function_name,
-    function_date: album.function_date,
-    view_lock_pin: album.view_lock_pin,
-    is_public: album.is_public,
-    status: album.status,
-    job_number: album.job_number,
-    studio_name: album.studio_name,
-    photographer_name: album.photographer_name,
-    mobile_number: album.mobile_number,
-    views_count: album.views_count,
-    likes_count: album.likes_count,
-    comments: album.comments
+    client_name: album.client_name || album.name || album.title,
+    function_name: album.function_name || 'Wedding',
+    function_date: album.function_date || new Date().toISOString().split('T')[0],
+    view_lock_pin: album.view_lock_pin || '',
+    is_public: album.is_public !== undefined ? album.is_public : true,
+    status: album.status || 'Published',
+    job_number: album.job_number || '',
+    studio_name: album.studio_name || '',
+    photographer_name: album.photographer_name || '',
+    mobile_number: album.mobile_number || '',
+    views_count: Number(album.views_count) || 0,
+    likes_count: Number(album.likes_count) || 0,
+    comments: Array.isArray(album.comments) ? album.comments : [],
+    image_urls: Array.isArray(album.image_urls) ? album.image_urls : []
   };
 
   const pageMarkingObj = {
@@ -93,10 +103,124 @@ function deserializeAlbumFromSupabase(dbAlbum: any): any {
     }
   }
 
+  // 1. Resolve Title and Client Name (supporting legacy 'name' column)
+  const title = dbAlbum.title || dbAlbum.name || extraMetadata.title || extraMetadata.name || 'My Celebration Album';
+  const clientName = extraMetadata.client_name || dbAlbum.client_name || dbAlbum.name || dbAlbum.title || 'Valued Client';
+
+  // 2. Resolve Template name normalization
+  let template = dbAlbum.template || extraMetadata.template || 'Classic Royal';
+  if (template.toLowerCase().includes('classic')) template = 'Classic Royal';
+  else if (template.toLowerCase().includes('floral')) template = 'Vibrant Floral';
+  else if (template.toLowerCase().includes('minimal')) template = 'Minimalist Elegance';
+  else if (template.toLowerCase().includes('sepia')) template = 'Vintage Sepia';
+  else if (template.toLowerCase().includes('slate')) template = 'Modern Slate';
+  else if (template.toLowerCase().includes('midnight')) template = 'Midnight Black';
+
+  // 3. Resolve Orientation normalization
+  let orientation = dbAlbum.orientation || extraMetadata.orientation || 'Landscape';
+  if (orientation.toLowerCase() === 'portrait') orientation = 'Portrait';
+  else if (orientation.toLowerCase() === 'square') orientation = 'Square';
+  else orientation = 'Landscape';
+
+  // 4. Resolve Spreads with full legacy fallback for 'image_urls' / string arrays
+  let rawSpreads = dbAlbum.spreads || extraMetadata.spreads;
+  if (typeof rawSpreads === 'string') {
+    try {
+      rawSpreads = JSON.parse(rawSpreads);
+    } catch (e) {
+      rawSpreads = [];
+    }
+  }
+
+  let finalSpreads: any[] = [];
+  if (Array.isArray(rawSpreads) && rawSpreads.length > 0) {
+    if (typeof rawSpreads[0] === 'string') {
+      for (let i = 0; i < rawSpreads.length; i += 2) {
+        finalSpreads.push({
+          id: Math.floor(i / 2) + 1,
+          leftImage: rawSpreads[i] || '',
+          rightImage: rawSpreads[i + 1] || '',
+          leftPageType: 'single',
+          rightPageType: 'single',
+          leftCanvasImages: [],
+          rightCanvasImages: []
+        });
+      }
+    } else {
+      finalSpreads = rawSpreads.map((s: any, idx: number) => ({
+        id: s.id || idx + 1,
+        leftImage: s.leftImage || s.left_image || s.url || '',
+        rightImage: s.rightImage || s.right_image || '',
+        leftPageType: s.leftPageType || 'single',
+        rightPageType: s.rightPageType || 'single',
+        leftCanvasImages: Array.isArray(s.leftCanvasImages) ? s.leftCanvasImages : [],
+        rightCanvasImages: Array.isArray(s.rightCanvasImages) ? s.rightCanvasImages : []
+      }));
+    }
+  } else {
+    const legacyImages = Array.isArray(dbAlbum.image_urls) 
+      ? dbAlbum.image_urls 
+      : (Array.isArray(extraMetadata.image_urls) ? extraMetadata.image_urls : (Array.isArray(dbAlbum.images) ? dbAlbum.images : []));
+
+    if (legacyImages.length > 0) {
+      for (let i = 0; i < legacyImages.length; i += 2) {
+        finalSpreads.push({
+          id: Math.floor(i / 2) + 1,
+          leftImage: typeof legacyImages[i] === 'string' ? legacyImages[i] : (legacyImages[i]?.url || ''),
+          rightImage: typeof legacyImages[i + 1] === 'string' ? legacyImages[i + 1] : (legacyImages[i + 1]?.url || ''),
+          leftPageType: 'single',
+          rightPageType: 'single',
+          leftCanvasImages: [],
+          rightCanvasImages: []
+        });
+      }
+    } else {
+      finalSpreads = [{
+        id: 1,
+        leftImage: '',
+        rightImage: '',
+        leftPageType: 'single',
+        rightPageType: 'single',
+        leftCanvasImages: [],
+        rightCanvasImages: []
+      }];
+    }
+  }
+
+  // 5. Resolve Cover & Media URLs
+  const coverUrl = dbAlbum.cover_url || extraMetadata.cover_url || dbAlbum.qr_code_url || (finalSpreads[0]?.leftImage || '') || '';
+
   return {
     ...dbAlbum,
     ...extraMetadata,
-    page_marking
+    id: String(dbAlbum.id || extraMetadata.id || ''),
+    title,
+    client_name: clientName,
+    function_name: extraMetadata.function_name || dbAlbum.function_name || 'Wedding',
+    function_date: extraMetadata.function_date || dbAlbum.function_date || (dbAlbum.created_at ? new Date(dbAlbum.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+    template,
+    orientation,
+    audio_url: dbAlbum.audio_url || extraMetadata.audio_url || '',
+    audio_name: extraMetadata.audio_name || dbAlbum.audio_name || '',
+    cover_url: coverUrl,
+    back_cover_url: extraMetadata.back_cover_url || dbAlbum.back_cover_url || '',
+    inner_front_url: extraMetadata.inner_front_url || dbAlbum.inner_front_url || '',
+    inner_back_url: extraMetadata.inner_back_url || dbAlbum.inner_back_url || '',
+    combined_inner_url: extraMetadata.combined_inner_url || dbAlbum.combined_inner_url || '',
+    is_combined_inner: Boolean(extraMetadata.is_combined_inner ?? dbAlbum.is_combined_inner ?? false),
+    spreads: finalSpreads,
+    page_marking,
+    views_count: Number(extraMetadata.views_count ?? dbAlbum.views_count ?? 0) || 0,
+    likes_count: Number(extraMetadata.likes_count ?? dbAlbum.likes_count ?? 0) || 0,
+    comments: Array.isArray(extraMetadata.comments) ? extraMetadata.comments : (Array.isArray(dbAlbum.comments) ? dbAlbum.comments : []),
+    view_lock_pin: extraMetadata.view_lock_pin || dbAlbum.view_lock_pin || '',
+    is_public: extraMetadata.is_public !== undefined ? extraMetadata.is_public : (dbAlbum.is_public !== undefined ? dbAlbum.is_public : true),
+    status: extraMetadata.status || dbAlbum.status || 'Published',
+    job_number: extraMetadata.job_number || dbAlbum.job_number || '',
+    studio_name: extraMetadata.studio_name || dbAlbum.studio_name || '',
+    photographer_name: extraMetadata.photographer_name || dbAlbum.photographer_name || '',
+    mobile_number: extraMetadata.mobile_number || dbAlbum.mobile_number || '',
+    created_at: dbAlbum.created_at || extraMetadata.created_at || new Date().toISOString()
   };
 }
 
@@ -306,46 +430,387 @@ async function startServer() {
     });
   });
 
-  // --- Server-Side Album Fallback Database ---
+  // --- Cloudflare R2 Database & Storage Integration ---
+  let r2Client: S3Client | null = null;
+  function getR2Client(): S3Client | null {
+    if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY || !process.env.R2_BUCKET_NAME) {
+      return null;
+    }
+    if (!r2Client) {
+      r2Client = new S3Client({
+        region: "auto",
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        },
+      });
+    }
+    return r2Client;
+  }
+
+  function getR2FileUrl(key: string): string {
+    if (process.env.R2_PUBLIC_URL) {
+      const base = process.env.R2_PUBLIC_URL.replace(/\/+$/, '');
+      return `${base}/${key}`;
+    }
+    return `/api/r2-file/${key.split('/').map(encodeURIComponent).join('/')}`;
+  }
+
   const albumsDir = path.join(process.cwd(), "data", "albums");
   if (!fs.existsSync(albumsDir)) {
     fs.mkdirSync(albumsDir, { recursive: true });
   }
 
-  // Get album by ID and increment views_count
-  app.get("/api/albums/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const filePath = path.join(albumsDir, `${id}.json`);
-      let albumData: any = null;
+  const uploadsDir = path.join(process.cwd(), "data", "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/api/local-uploads', express.static(uploadsDir));
 
-      if (fs.existsSync(filePath)) {
-        try {
-          const fileContent = fs.readFileSync(filePath, "utf-8");
-          albumData = JSON.parse(fileContent);
-        } catch (e) {
-          console.error("Error reading JSON file:", e);
-        }
+  // Save album to Cloudflare R2 and local cache
+  async function saveAlbumToCloudflareR2(albumData: any): Promise<void> {
+    const id = albumData.id;
+    const jsonStr = JSON.stringify(albumData, null, 2);
+
+    // 1. Write to local server disk cache
+    const filePath = path.join(albumsDir, `${id}.json`);
+    fs.writeFileSync(filePath, jsonStr, "utf-8");
+
+    // 2. Write to Cloudflare R2
+    const client = getR2Client();
+    if (client && process.env.R2_BUCKET_NAME) {
+      try {
+        await client.send(new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: `albums-data/${id}.json`,
+          Body: Buffer.from(jsonStr, 'utf-8'),
+          ContentType: 'application/json',
+        }));
+        console.log(`[Cloudflare R2] Successfully saved album ${id} to bucket ${process.env.R2_BUCKET_NAME}`);
+      } catch (err: any) {
+        console.error(`[Cloudflare R2] Error saving album ${id} to R2:`, err.message);
       }
+    }
+  }
 
-      // If not found in local file system, see if we can get it from Supabase
-      if (!albumData) {
-        const supabaseClient = getSupabaseClient();
-        if (supabaseClient) {
-          const { data, error } = await supabaseClient
-            .from("albums")
-            .select("*")
-            .eq("id", id)
-            .single();
+  // Get album by ID from Cloudflare R2 / local cache
+  async function getAlbumFromCloudflareR2(id: string): Promise<any | null> {
+    // 1. Check local disk first
+    const filePath = path.join(albumsDir, `${id}.json`);
+    if (fs.existsSync(filePath)) {
+      try {
+        const content = fs.readFileSync(filePath, "utf-8");
+        return JSON.parse(content);
+      } catch (e) {
+        console.warn(`Failed reading local album ${id}:`, e);
+      }
+    }
 
-          if (!error && data) {
-            albumData = deserializeAlbumFromSupabase(data);
+    // 2. Check Cloudflare R2
+    const client = getR2Client();
+    if (client && process.env.R2_BUCKET_NAME) {
+      try {
+        const response = await client.send(new GetObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: `albums-data/${id}.json`,
+        }));
+        if (response.Body) {
+          const str = await (response.Body as any).transformToString();
+          const parsed = JSON.parse(str);
+          // Cache to local disk
+          fs.writeFileSync(filePath, str, "utf-8");
+          return parsed;
+        }
+      } catch (err: any) {
+        console.warn(`[Cloudflare R2] Album ${id} not found in R2:`, err.message);
+      }
+    }
+
+    // 3. Fallback: Supabase (for legacy compatibility)
+    const supabaseClient = getSupabaseClient();
+    if (supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient
+          .from("albums")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (!error && data) {
+          const parsed = deserializeAlbumFromSupabase(data);
+          fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2), "utf-8");
+          return parsed;
+        }
+      } catch (e) {
+        console.warn(`Supabase fallback failed for album ${id}:`, e);
+      }
+    }
+
+    return null;
+  }
+
+  // List all albums from Cloudflare R2 & disk
+  async function listAlbumsFromCloudflareR2(): Promise<any[]> {
+    const albumMap = new Map<string, any>();
+
+    // 1. Read from local disk cache
+    if (fs.existsSync(albumsDir)) {
+      const files = fs.readdirSync(albumsDir);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          try {
+            const content = fs.readFileSync(path.join(albumsDir, file), "utf-8");
+            const album = JSON.parse(content);
+            if (album && album.id) {
+              albumMap.set(String(album.id), album);
+            }
+          } catch (e) {
+            console.warn(`Error reading album file ${file}:`, e);
           }
         }
       }
+    }
+
+    // 2. Query Cloudflare R2 `albums-data/`
+    const client = getR2Client();
+    if (client && process.env.R2_BUCKET_NAME) {
+      try {
+        const listResp = await client.send(new ListObjectsV2Command({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Prefix: 'albums-data/',
+        }));
+
+        if (listResp.Contents) {
+          for (const item of listResp.Contents) {
+            if (item.Key && item.Key.endsWith('.json')) {
+              const albumId = item.Key.replace('albums-data/', '').replace('.json', '');
+              if (!albumMap.has(albumId)) {
+                try {
+                  const getResp = await client.send(new GetObjectCommand({
+                    Bucket: process.env.R2_BUCKET_NAME,
+                    Key: item.Key,
+                  }));
+                  if (getResp.Body) {
+                    const str = await (getResp.Body as any).transformToString();
+                    const parsed = JSON.parse(str);
+                    if (parsed && parsed.id) {
+                      albumMap.set(String(parsed.id), parsed);
+                      // Cache locally
+                      fs.writeFileSync(path.join(albumsDir, `${parsed.id}.json`), str, "utf-8");
+                    }
+                  }
+                } catch (readErr) {
+                  console.warn(`Failed reading R2 album ${item.Key}:`, readErr);
+                }
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[Cloudflare R2] List albums error:`, err.message);
+      }
+    }
+
+    // 3. Merge legacy Supabase albums if any
+    const supabaseClient = getSupabaseClient();
+    if (supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient.from("albums").select("*");
+        if (!error && Array.isArray(data)) {
+          for (const raw of data) {
+            const parsed = deserializeAlbumFromSupabase(raw);
+            if (parsed && parsed.id && !albumMap.has(String(parsed.id))) {
+              albumMap.set(String(parsed.id), parsed);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Supabase legacy list sync skipped:", e);
+      }
+    }
+
+    const allAlbums = Array.from(albumMap.values());
+    allAlbums.sort((a, b) => {
+      const dateA = new Date(a.created_at || '').getTime();
+      const dateB = new Date(b.created_at || '').getTime();
+      return dateB - dateA;
+    });
+
+    return allAlbums;
+  }
+
+  // Delete album from Cloudflare R2 & disk
+  async function deleteAlbumFromCloudflareR2(id: string): Promise<void> {
+    // 1. Delete local file
+    const filePath = path.join(albumsDir, `${id}.json`);
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.warn("Failed to delete local album file:", e);
+      }
+    }
+
+    // 2. Delete from Cloudflare R2
+    const client = getR2Client();
+    if (client && process.env.R2_BUCKET_NAME) {
+      try {
+        await client.send(new DeleteObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: `albums-data/${id}.json`,
+        }));
+      } catch (e) {
+        console.warn("Failed to delete R2 album json:", e);
+      }
+    }
+
+    // 3. Delete from Supabase if connected
+    const supabaseClient = getSupabaseClient();
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from("albums").delete().eq("id", id);
+      } catch (e) {
+        console.warn("Failed to delete from Supabase:", e);
+      }
+    }
+  }
+
+  // Stream/proxy R2 assets with public caching
+  app.get(['/api/r2-file/*', '/album/api/r2-file/*'], async (req, res) => {
+    try {
+      const key = req.params[0] || req.url.split('/r2-file/')[1];
+      if (!key) return res.status(400).send("Missing key");
+
+      const decodedKey = decodeURIComponent(key);
+      const client = getR2Client();
+      if (!client || !process.env.R2_BUCKET_NAME) {
+        return res.status(500).send("Cloudflare R2 is not configured");
+      }
+
+      const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: decodedKey,
+      });
+
+      const response = await client.send(command);
+
+      if (response.ContentType) {
+        res.setHeader('Content-Type', response.ContentType);
+      }
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      if (response.ContentLength) {
+        res.setHeader('Content-Length', response.ContentLength);
+      }
+
+      (response.Body as any).pipe(res);
+    } catch (err: any) {
+      console.error("Error streaming R2 file:", err.message);
+      res.status(404).send("File not found");
+    }
+  });
+
+  // Direct Upload to Cloudflare R2 (Supports Multipart File & Base64 DataURL)
+  app.post(['/api/r2-upload', '/album/api/r2-upload'], upload.single('file'), async (req, res) => {
+    try {
+      const client = getR2Client();
+      let buffer: Buffer;
+      let contentType = 'image/jpeg';
+      let albumId = req.body.albumId || 'general';
+      let filename = req.body.filename || `img_${Date.now()}.jpg`;
+
+      if (req.file) {
+        buffer = req.file.buffer;
+        contentType = req.file.mimetype || 'image/jpeg';
+        filename = req.file.originalname || filename;
+      } else if (req.body.dataUrl) {
+        const parts = req.body.dataUrl.split(';base64,');
+        if (parts.length === 2) {
+          const mimeMatch = parts[0].match(/:(.*?)$/);
+          if (mimeMatch) contentType = mimeMatch[1];
+          buffer = Buffer.from(parts[1], 'base64');
+        } else {
+          buffer = Buffer.from(req.body.dataUrl, 'base64');
+        }
+      } else {
+        return res.status(400).json({ success: false, message: "No file or dataUrl provided" });
+      }
+
+      const cleanFilename = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const objectKey = `albums/${albumId}/${Date.now()}_${cleanFilename}`;
+
+      if (client && process.env.R2_BUCKET_NAME) {
+        await client.send(new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: objectKey,
+          Body: buffer,
+          ContentType: contentType,
+        }));
+        const fileUrl = getR2FileUrl(objectKey);
+        return res.json({ success: true, url: fileUrl, key: objectKey });
+      } else {
+        // Fallback to local server disk upload if R2 credentials not supplied
+        const albumUploadDir = path.join(uploadsDir, albumId);
+        if (!fs.existsSync(albumUploadDir)) fs.mkdirSync(albumUploadDir, { recursive: true });
+        const localFile = path.join(albumUploadDir, `${Date.now()}_${cleanFilename}`);
+        fs.writeFileSync(localFile, buffer);
+        const localUrl = `/api/local-uploads/${albumId}/${path.basename(localFile)}`;
+        return res.json({ success: true, url: localUrl, key: cleanFilename });
+      }
+    } catch (err: any) {
+      console.error("Cloudflare R2 direct upload error:", err);
+      res.status(500).json({ success: false, message: err.message || "Failed to upload image" });
+    }
+  });
+
+  // Presigned URL generator for client direct PUT upload to R2
+  app.post(['/api/r2-upload-url', '/album/api/r2-upload-url'], async (req, res) => {
+    try {
+      const { albumId = 'general', filename = `photo_${Date.now()}.jpg`, contentType = 'image/jpeg' } = req.body;
+      const client = getR2Client();
+
+      if (!client || !process.env.R2_BUCKET_NAME) {
+        return res.status(500).json({ success: false, message: "Cloudflare R2 is not configured on the server." });
+      }
+
+      const cleanFilename = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const objectKey = `albums/${albumId}/${Date.now()}_${cleanFilename}`;
+
+      const command = new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: objectKey,
+        ContentType: contentType,
+      });
+
+      const presignedUrl = await getSignedUrl(client, command, { expiresIn: 3600 });
+      const publicUrl = getR2FileUrl(objectKey);
+
+      res.json({ success: true, uploadUrl: presignedUrl, objectKey, publicUrl });
+    } catch (error: any) {
+      console.error("Error generating R2 presigned URL:", error);
+      res.status(500).json({ success: false, message: "Failed to generate upload URL", error: error.message });
+    }
+  });
+
+  // GET /api/albums -> List all albums from Cloudflare R2 / disk
+  app.get(['/api/albums', '/album/api/albums'], async (req, res) => {
+    try {
+      const albumsList = await listAlbumsFromCloudflareR2();
+      return res.json({ success: true, data: albumsList });
+    } catch (err: any) {
+      console.error("Error listing albums:", err);
+      return res.status(500).json({ success: false, message: "Internal server error listing albums", error: err.message });
+    }
+  });
+
+  // GET /api/albums/:id -> Get single album and increment views
+  app.get(['/api/albums/:id', '/album/api/albums/:id'], async (req, res) => {
+    try {
+      const { id } = req.params;
+      const albumData = await getAlbumFromCloudflareR2(id);
 
       if (!albumData) {
-        return res.status(404).json({ success: false, message: "Album not found on server" });
+        return res.status(404).json({ success: false, message: "Album not found on Cloudflare R2 or server" });
       }
 
       // Ensure stats fields exist
@@ -356,8 +821,8 @@ async function startServer() {
       // Increment views
       albumData.views_count += 1;
 
-      // Save updated data to filesystem
-      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+      // Asynchronously update view count
+      saveAlbumToCloudflareR2(albumData).catch(e => console.warn("Failed to persist view count update:", e));
 
       return res.json({ success: true, data: albumData });
     } catch (err: any) {
@@ -366,35 +831,12 @@ async function startServer() {
     }
   });
 
-  // Update likes for an album
-  app.post("/api/albums/:id/like", async (req, res) => {
+  // POST /api/albums/:id/like -> Update likes
+  app.post(['/api/albums/:id/like', '/album/api/albums/:id/like'], async (req, res) => {
     try {
       const { id } = req.params;
       const { action } = req.body; // 'like' or 'unlike'
-      const filePath = path.join(albumsDir, `${id}.json`);
-      let albumData: any = null;
-
-      if (fs.existsSync(filePath)) {
-        try {
-          albumData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-        } catch (e) {
-          console.error("Error reading JSON file:", e);
-        }
-      }
-
-      if (!albumData) {
-        const supabaseClient = getSupabaseClient();
-        if (supabaseClient) {
-          const { data, error } = await supabaseClient
-            .from("albums")
-            .select("*")
-            .eq("id", id)
-            .single();
-          if (!error && data) {
-            albumData = deserializeAlbumFromSupabase(data);
-          }
-        }
-      }
+      const albumData = await getAlbumFromCloudflareR2(id);
 
       if (!albumData) {
         return res.status(404).json({ success: false, message: "Album not found to update likes" });
@@ -410,7 +852,7 @@ async function startServer() {
         albumData.likes_count = Math.max(0, albumData.likes_count - 1);
       }
 
-      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+      await saveAlbumToCloudflareR2(albumData);
       return res.json({ success: true, likes_count: albumData.likes_count });
     } catch (err: any) {
       console.error("Error updating likes:", err);
@@ -418,8 +860,8 @@ async function startServer() {
     }
   });
 
-  // Add a comment to an album
-  app.post("/api/albums/:id/comment", async (req, res) => {
+  // POST /api/albums/:id/comment -> Add comment
+  app.post(['/api/albums/:id/comment', '/album/api/albums/:id/comment'], async (req, res) => {
     try {
       const { id } = req.params;
       const { comment } = req.body;
@@ -427,31 +869,7 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "Comment cannot be empty" });
       }
 
-      const filePath = path.join(albumsDir, `${id}.json`);
-      let albumData: any = null;
-
-      if (fs.existsSync(filePath)) {
-        try {
-          albumData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-        } catch (e) {
-          console.error("Error reading JSON file:", e);
-        }
-      }
-
-      if (!albumData) {
-        const supabaseClient = getSupabaseClient();
-        if (supabaseClient) {
-          const { data, error } = await supabaseClient
-            .from("albums")
-            .select("*")
-            .eq("id", id)
-            .single();
-          if (!error && data) {
-            albumData = deserializeAlbumFromSupabase(data);
-          }
-        }
-      }
-
+      const albumData = await getAlbumFromCloudflareR2(id);
       if (!albumData) {
         return res.status(404).json({ success: false, message: "Album not found to add comment" });
       }
@@ -462,7 +880,7 @@ async function startServer() {
 
       albumData.comments.push(comment.trim());
 
-      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+      await saveAlbumToCloudflareR2(albumData);
       return res.json({ success: true, comments: albumData.comments });
     } catch (err: any) {
       console.error("Error adding comment:", err);
@@ -470,85 +888,63 @@ async function startServer() {
     }
   });
 
-  // Save/Update album
-  app.post("/api/albums", async (req, res) => {
+  // POST /api/albums -> Save/Update album to Cloudflare R2
+  app.post(['/api/albums', '/album/api/albums'], async (req, res) => {
     try {
       const payload = req.body;
       let id = payload.id;
 
-      // Generate stable ID if none provided or starts with local_ / preview
       if (!id || id === "preview" || id.startsWith("local_")) {
-        id = `album_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const cleanedSlug = (payload.client_name || payload.title || 'album')
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        const randomCode = Math.floor(1000 + Math.random() * 9000);
+        id = `${cleanedSlug}-${randomCode}`;
       }
 
-      // Preserve existing stats if already on server disk
-      let existingViews = 0;
-      let existingLikes = 0;
-      let existingComments: string[] = [];
-      const filePath = path.join(albumsDir, `${id}.json`);
-      if (fs.existsSync(filePath)) {
-        try {
-          const oldData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          existingViews = oldData.views_count || 0;
-          existingLikes = oldData.likes_count || 0;
-          existingComments = oldData.comments || [];
-        } catch (e) {
-          console.warn("Failed to read old stats:", e);
-        }
-      }
-
+      // Preserve stats
+      const existing = await getAlbumFromCloudflareR2(id);
       const albumData = {
         ...payload,
         id,
-        views_count: payload.views_count !== undefined ? payload.views_count : existingViews,
-        likes_count: payload.likes_count !== undefined ? payload.likes_count : existingLikes,
-        comments: payload.comments !== undefined ? payload.comments : existingComments,
-        created_at: payload.created_at || new Date().toISOString()
+        views_count: payload.views_count !== undefined ? payload.views_count : (existing?.views_count || 0),
+        likes_count: payload.likes_count !== undefined ? payload.likes_count : (existing?.likes_count || 0),
+        comments: payload.comments !== undefined ? payload.comments : (existing?.comments || []),
+        created_at: payload.created_at || existing?.created_at || new Date().toISOString()
       };
 
-      fs.writeFileSync(filePath, JSON.stringify(albumData, null, 2), "utf-8");
+      await saveAlbumToCloudflareR2(albumData);
 
-      // Also try to sync with Supabase if configured
+      // Also try syncing to Supabase if configured (as background non-blocking task)
       const supabaseClient = getSupabaseClient();
       if (supabaseClient) {
         try {
           const dbPayload = serializeAlbumForSupabase(albumData);
-          
-          // If the original id is a valid uuid, we can update or insert with it
-          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-          if (isValidUUID) {
-            await supabaseClient.from("albums").upsert(dbPayload);
-          } else {
-            // Try to upsert the custom text ID directly (in case they updated the table schema in Supabase SQL editor)
-            const { error: textUpsertError } = await supabaseClient.from("albums").upsert(dbPayload);
-            if (textUpsertError) {
-              console.log("Supabase direct custom ID upsert failed (likely uuid type column), falling back to letting Supabase generate a UUID:", textUpsertError.message);
-              // Fallback: Let Supabase auto-generate its own UUID
-              const { id: dummyId, ...restPayload } = dbPayload;
-              const { data, error } = await supabaseClient.from("albums").insert([restPayload]).select("id").single();
-              if (data && !error) {
-                const newId = data.id;
-                const newFilePath = path.join(albumsDir, `${newId}.json`);
-                const updatedAlbumData = { ...albumData, id: newId };
-                fs.writeFileSync(newFilePath, JSON.stringify(updatedAlbumData, null, 2), "utf-8");
-                // delete the old temporary file if it existed under the old generated ID
-                if (fs.existsSync(filePath)) {
-                  fs.unlinkSync(filePath);
-                }
-                id = newId;
-                albumData.id = newId;
-              }
-            }
-          }
+          await supabaseClient.from("albums").upsert(dbPayload);
         } catch (dbErr) {
-          console.warn("Could not sync album to Supabase, but saved locally on server filesystem:", dbErr);
+          console.warn("Optional Supabase sync skipped:", dbErr);
         }
       }
 
       return res.json({ success: true, data: albumData });
     } catch (err: any) {
-      console.error("Error saving album:", err);
-      return res.status(500).json({ success: false, message: "Internal server error saving album", error: err.message });
+      console.error("Error saving album to Cloudflare R2:", err);
+      return res.status(500).json({ success: false, message: "Failed saving album to Cloudflare R2", error: err.message });
+    }
+  });
+
+  // DELETE /api/albums/:id -> Delete album from Cloudflare R2
+  app.delete(['/api/albums/:id', '/album/api/albums/:id', '/api/albums', '/album/api/albums'], async (req, res) => {
+    try {
+      const id = req.params.id || (req.query.id as string);
+      if (!id) return res.status(400).json({ success: false, message: "Album ID is required" });
+      await deleteAlbumFromCloudflareR2(id);
+      return res.json({ success: true, message: `Album ${id} deleted successfully from Cloudflare R2.` });
+    } catch (err: any) {
+      console.error("Error deleting album:", err);
+      return res.status(500).json({ success: false, message: "Error deleting album", error: err.message });
     }
   });
 
@@ -848,6 +1244,210 @@ Extract the structured search criteria from the user's natural language input.
         inStockOnly: false,
         aiInsight: "Exploring our complete customizable inventory for you!"
       });
+    }
+  });
+
+  // --- PSD Upload & Auto-Analyze ---
+  app.post('/api/upload-psd', upload.single('psdFile'), async (req: any, res: any) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({ error: 'Supabase credentials missing' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PSD file uploaded' });
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+    try {
+      // 1. Upload raw PSD to Supabase Storage bucket named 'raw-psd'
+      const psdFilename = `${Date.now()}-${req.file.originalname}`;
+      const { data: rawUploadData, error: rawUploadError } = await supabaseClient.storage
+        .from('raw-psd')
+        .upload(psdFilename, req.file.buffer, {
+          contentType: 'image/vnd.adobe.photoshop'
+        });
+
+      if (rawUploadError) {
+        console.error("Failed to upload raw PSD:", rawUploadError);
+      }
+      
+      const rawPsdPath = rawUploadData?.path || psdFilename;
+
+      // 2. Parse PSD using ag-psd
+      const { initializeCanvas } = await import('ag-psd');
+      initializeCanvas((width, height) => createCanvas(width, height) as any);
+      
+      const psd = readPsd(req.file.buffer, { skipCompositeImageData: false, skipThumbnail: true });
+      const layersData: any[] = [];
+      
+      const canvasWidth = psd.width;
+      const canvasHeight = psd.height;
+
+      // Extract composite image for preview if possible
+      let previewUrl = "";
+      if (psd.canvas) {
+        const previewBuffer = (psd.canvas as any).toBuffer('image/png');
+        const previewFilename = `preview-${psdFilename}.png`;
+        const { data: previewUploadData } = await supabaseClient.storage
+          .from('processed-layers')
+          .upload(previewFilename, previewBuffer, { contentType: 'image/png' });
+          
+        if (previewUploadData) {
+          const { data: { publicUrl } } = supabaseClient.storage.from('processed-layers').getPublicUrl(previewFilename);
+          previewUrl = publicUrl;
+        }
+      }
+
+      // Process layers
+      if (psd.children) {
+        for (let i = 0; i < psd.children.length; i++) {
+          const layer = psd.children[i];
+          if (layer.hidden) continue;
+
+          const layerName = layer.name || `Layer ${i}`;
+          const left = layer.left || 0;
+          const top = layer.top || 0;
+          const width = (layer.right || 0) - left;
+          const height = (layer.bottom || 0) - top;
+          const opacity = (layer.opacity ?? 255) / 255;
+
+          if (layer.text) {
+            const textContent = layer.text.text || "";
+            let fontSize = 24;
+            let fontName = "Arial"; // Default fallback font
+            
+            // Note: If PSD uses a font not available on the web, falling back to a default web-safe font.
+            if (layer.text.transform && layer.text.transform[0]) {
+              fontSize = Math.round(layer.text.transform[0] * 12) || 24; 
+            }
+            
+            layersData.push({
+              name: layerName,
+              type: 'text',
+              text: textContent,
+              left,
+              top,
+              width,
+              height,
+              opacity,
+              font: fontName,
+              fontSize
+            });
+          } else if (layer.canvas) {
+            // It's a raster/image layer
+            try {
+              const buffer = (layer.canvas as any).toBuffer('image/png');
+              const layerFilename = `layer-${Date.now()}-${i}.png`;
+              
+              const { data: layerUploadData } = await supabaseClient.storage
+                .from('processed-layers')
+                .upload(layerFilename, buffer, { contentType: 'image/png' });
+
+              if (layerUploadData) {
+                const { data: { publicUrl } } = supabaseClient.storage.from('processed-layers').getPublicUrl(layerFilename);
+                layersData.push({
+                  name: layerName,
+                  type: 'image',
+                  url: publicUrl,
+                  left,
+                  top,
+                  width,
+                  height,
+                  opacity
+                });
+              }
+            } catch (err) {
+              console.warn(`Skipped layer ${layerName} due to rendering error`, err);
+            }
+          } else {
+            console.log(`Layer ${layerName} unsupported, skipped.`);
+          }
+        }
+      }
+      
+      // Save metadata to psd_templates
+      const { data: dbData, error: dbError } = await supabaseClient
+        .from('psd_templates')
+        .insert([{
+          source_path: rawPsdPath,
+          canvas_width: canvasWidth,
+          canvas_height: canvasHeight,
+          layers: layersData,
+          preview_url: previewUrl // Optional, added for ease of use
+        }])
+        .select('id')
+        .single();
+        
+      if (dbError) {
+         console.error("Database insert error:", dbError);
+         return res.status(500).json({ error: "Failed to save template to database." });
+      }
+
+      res.json({
+        success: true,
+        templateId: dbData.id,
+        canvasWidth,
+        canvasHeight,
+        layers: layersData,
+        previewUrl
+      });
+      
+    } catch (err: any) {
+      console.error("PSD processing error:", err);
+      // "Handle serverless function timeout risk for large PSD files — if using Vercel Hobby tier (10s limit)..."
+      // "on Pro tier (60s) mention this in a code comment"
+      res.status(500).json({ error: "PSD parsing failed. Note: Processing large PSD files may timeout on serverless environments (Vercel 10s/60s limits). Please try reducing file size." });
+    }
+  });
+
+  // R2 Storage: Get presigned URL for album image upload
+  app.post("/api/r2-upload-url", async (req, res) => {
+    try {
+      const { albumId, filename, contentType } = req.body;
+      if (!albumId || !filename || !contentType) {
+        return res.status(400).json({ success: false, message: "Missing required fields" });
+      }
+
+      if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY || !process.env.R2_BUCKET_NAME) {
+        return res.status(500).json({ success: false, message: "R2 credentials are not configured on the server." });
+      }
+
+      const s3Client = new S3Client({
+        region: "auto",
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        },
+      });
+
+      // Must start with albums/ as per requirements
+      const objectKey = `albums/${albumId}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+
+      const command = new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: objectKey,
+        ContentType: contentType,
+      });
+
+      const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      // The public URL assuming the bucket is configured for public access or we just store the key
+      // If no public domain is specified, we store the raw presigned URL or just the bucket URL. 
+      // Cloudflare R2 public bucket URLs look like https://pub-<id>.r2.dev or a custom domain.
+      // We will just return the key so the client can construct the URL if they have a public domain,
+      // or we can just return a direct URL if R2 bucket is public.
+      // Let's assume the public URL format is: https://<bucket>.r2.cloudflarestorage.com or similar, but typically users set up a custom domain.
+      // For now, we will return the endpoint + bucket + key.
+      const publicUrl = `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${process.env.R2_BUCKET_NAME}/${objectKey}`;
+
+      res.json({ success: true, uploadUrl: presignedUrl, objectKey, publicUrl });
+    } catch (error) {
+      console.error("Error generating presigned URL:", error);
+      res.status(500).json({ success: false, message: "Failed to generate upload URL" });
     }
   });
 

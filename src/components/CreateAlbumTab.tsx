@@ -23,7 +23,12 @@ import {
   FolderOpen,
   FolderMinus,
   HelpCircle,
-  FolderCheck
+  FolderCheck,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  FileAudio
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Album, Spread, CanvasImage } from '../types/album';
@@ -92,13 +97,15 @@ export default function CreateAlbumTab({
   const [selectedActive, setSelectedActive] = useState<{ spreadId: number | string, page: 'left' | 'right', imgId: string } | null>(null);
   const [canvasMultiTarget, setCanvasMultiTarget] = useState<{ spreadId: number | string, page: 'left' | 'right' } | null>(null);
   const [showViewPin, setShowViewPin] = useState(false);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
 
-  // Hidden Inputs Refs
+  // Hidden Inputs Refs & Audio player ref
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const canvasMultiInputRef = useRef<HTMLInputElement>(null);
   const sheet12x36InputRef = useRef<HTMLInputElement>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const currentUploadTarget = useRef<{
     type: 'cover' | 'back_cover' | 'inner_front' | 'inner_back' | 'combined_inner' | 'left' | 'right' | 'canvas',
@@ -134,9 +141,9 @@ export default function CreateAlbumTab({
     return count;
   };
 
-  // Image compressor helper
-  const resizeImage = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
+  // Image compressor helper - scales down ultra-high-resolution photos to crisp responsive dimensions and applies compression
+  const resizeImage = (file: File, maxDimension = 2048, quality = 0.85): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
@@ -144,28 +151,33 @@ export default function CreateAlbumTab({
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
 
           if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
+            if (width > maxDimension) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
             }
           } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
+            if (height > maxDimension) {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
             }
           }
+
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+          }
+          resolve(canvas.toDataURL('image/jpeg', quality));
         };
+        img.onerror = () => reject(new Error('Failed to decode image'));
         img.src = e.target?.result as string;
       };
+      reader.onerror = () => reject(new Error('Failed to read file'));
       reader.readAsDataURL(file);
     });
   };
@@ -533,6 +545,7 @@ export default function CreateAlbumTab({
   const handleAudioSelect = (trackId: string) => {
     const track = preloadedAudioTracks.find(t => t.id === trackId);
     if (!track) return;
+    setIsPreviewPlaying(false);
     setAlbum(prev => ({
       ...prev,
       audio_url: track.url || '',
@@ -545,21 +558,60 @@ export default function CreateAlbumTab({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error('Audio files must be under 8MB to optimize storage.');
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Audio files must be under 25MB.');
       return;
     }
 
+    toast.info(`Uploading custom song: ${file.name}...`);
     const reader = new FileReader();
     reader.onload = (ev) => {
+      const audioData = ev.target?.result as string;
+      setIsPreviewPlaying(false);
       setAlbum(prev => ({
         ...prev,
-        audio_url: ev.target?.result as string,
+        audio_url: audioData,
         audio_name: file.name
       }));
-      toast.success(`Uploaded background music: ${file.name}`);
+      toast.success(`🎵 Custom song uploaded: ${file.name}`);
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read audio file.');
     };
     reader.readAsDataURL(file);
+  };
+
+  const toggleAudioPreview = () => {
+    if (!album.audio_url) {
+      toast.info('Please select or upload a song first.');
+      return;
+    }
+    if (!previewAudioRef.current) return;
+
+    if (isPreviewPlaying) {
+      previewAudioRef.current.pause();
+      setIsPreviewPlaying(false);
+    } else {
+      previewAudioRef.current.play().then(() => {
+        setIsPreviewPlaying(true);
+      }).catch(err => {
+        console.warn("Audio playback error:", err);
+        toast.error("Could not play audio track");
+      });
+    }
+  };
+
+  const removeAudio = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+    }
+    setIsPreviewPlaying(false);
+    setAlbum(prev => ({
+      ...prev,
+      audio_url: '',
+      audio_name: ''
+    }));
+    toast.info('Background music removed.');
   };
 
   const triggerUpload = (type: 'cover' | 'back_cover' | 'inner_front' | 'inner_back' | 'combined_inner', spreadId?: number | string) => {
@@ -757,10 +809,18 @@ export default function CreateAlbumTab({
     <div className="space-y-8 text-white font-sans">
       {/* Hidden file selectors */}
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
-      <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioUpload} />
+      <input type="file" ref={audioInputRef} className="hidden" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" onChange={handleAudioUpload} />
       <input type="file" ref={multiFileInputRef} className="hidden" accept="image/*" multiple onChange={handleMultiFileUpload} />
       <input type="file" ref={canvasMultiInputRef} className="hidden" accept="image/*" multiple onChange={handleCanvasMultiUpload} />
       <input type="file" ref={sheet12x36InputRef} className="hidden" accept="image/*" multiple onChange={handle12x36Upload} />
+      
+      {/* Audio player element for preview */}
+      <audio 
+        ref={previewAudioRef} 
+        src={album.audio_url || undefined} 
+        onEnded={() => setIsPreviewPlaying(false)}
+        onPause={() => setIsPreviewPlaying(false)}
+      />
 
       {/* Editor top controls bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121214] border border-[#1e1e21] p-4 rounded-2xl shadow-xl">
@@ -862,33 +922,88 @@ export default function CreateAlbumTab({
           </div>
 
           {/* Background Music Selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 flex items-center justify-between">
-              <span>Background music</span>
+          <div className="space-y-2.5 bg-[#0e0e10] border border-zinc-800/80 rounded-2xl p-3.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <MusicIcon className="w-3.5 h-3.5 text-amber-500" />
+                <span>Background Music</span>
+              </label>
+              
               <button 
                 type="button"
                 onClick={() => audioInputRef.current?.click()}
-                className="text-[10px] text-amber-500 hover:underline font-bold"
+                className="text-[11px] px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg font-bold flex items-center gap-1 transition-all"
               >
-                Upload Custom Audio
+                <Upload className="w-3 h-3" /> Upload Song (MP3/WAV)
               </button>
-            </label>
+            </div>
+
+            {/* Preloaded theme selector */}
             <div className="relative">
               <select
-                value={preloadedAudioTracks.find(t => t.url === album.audio_url)?.id || ''}
-                onChange={(e) => handleAudioSelect(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-[#09090b] border border-zinc-800 rounded-xl focus:border-amber-500/50 outline-none text-sm text-zinc-300 cursor-pointer"
+                value={preloadedAudioTracks.find(t => t.url === album.audio_url)?.id || (album.audio_url ? 'custom' : '')}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    audioInputRef.current?.click();
+                  } else if (e.target.value) {
+                    handleAudioSelect(e.target.value);
+                  } else {
+                    removeAudio();
+                  }
+                }}
+                className="w-full pl-8 pr-3 py-2 bg-[#09090b] border border-zinc-800 rounded-xl focus:border-amber-500/50 outline-none text-xs text-zinc-300 cursor-pointer"
               >
+                <option value="">-- Choose Preloaded Theme Music --</option>
                 {preloadedAudioTracks.map(track => (
                   <option key={track.id} value={track.id}>{track.name}</option>
                 ))}
+                {album.audio_url && !preloadedAudioTracks.some(t => t.url === album.audio_url) && (
+                  <option value="custom">📁 Custom Uploaded: {album.audio_name || 'Custom Track'}</option>
+                )}
               </select>
-              <MusicIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <FileAudio className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
             </div>
-            {album.audio_name && (
-              <span className="text-[10px] text-zinc-500 truncate block bg-zinc-950 p-1.5 rounded border border-zinc-900 font-mono">
-                🎵 Active: {album.audio_name}
-              </span>
+
+            {/* Live Audio Player & Status */}
+            {album.audio_url ? (
+              <div className="flex items-center justify-between gap-2 p-2 bg-black/60 border border-amber-500/20 rounded-xl">
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    type="button"
+                    onClick={toggleAudioPreview}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isPreviewPlaying ? 'bg-amber-500 text-black animate-pulse' : 'bg-zinc-800 hover:bg-zinc-700 text-white'}`}
+                    title={isPreviewPlaying ? "Pause Preview" : "Play Preview"}
+                  >
+                    {isPreviewPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
+                  </button>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-semibold text-zinc-200 block truncate">
+                      {album.audio_name || 'Theme Soundtrack'}
+                    </span>
+                    <span className="text-[9px] text-amber-500/80 font-mono block">
+                      {isPreviewPlaying ? '▶ Playing preview...' : 'Ready to play'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={removeAudio}
+                  className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  title="Remove Audio Track"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div 
+                onClick={() => audioInputRef.current?.click()}
+                className="text-center p-2.5 border border-dashed border-zinc-800 hover:border-amber-500/40 rounded-xl cursor-pointer bg-zinc-950/40 transition-colors group"
+              >
+                <span className="text-[11px] text-zinc-500 group-hover:text-amber-400 flex items-center justify-center gap-1.5">
+                  <Upload className="w-3 h-3" /> Select a song above or click here to upload your own MP3/WAV
+                </span>
+              </div>
             )}
           </div>
 

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase, deserializeAlbumFromSupabase } from '../supabase';
+import { fetchAlbumsFromR2 } from '../lib/r2Storage';
 
 /* ========================================================
    DASHBOARD TAB OVERVIEW
@@ -46,12 +47,19 @@ export function DashboardOverviewTab({ onNavigateTab, totalAlbums = 0 }: { onNav
   const syncData = async (showToast = false) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('albums')
-        .select('*');
+      // 1. Fetch live albums from Cloudflare R2
+      let fetchedList = await fetchAlbumsFromR2();
 
-      if (error) {
-        throw error;
+      // 2. Fallback to Supabase if R2 is empty
+      if (fetchedList.length === 0) {
+        try {
+          const { data } = await supabase.from('albums').select('*');
+          if (data && Array.isArray(data)) {
+            fetchedList = data.map(deserializeAlbumFromSupabase);
+          }
+        } catch (e) {
+          console.warn("Supabase stats sync fallback skipped:", e);
+        }
       }
 
       const todayStr = new Date().toDateString();
@@ -61,7 +69,6 @@ export function DashboardOverviewTab({ onNavigateTab, totalAlbums = 0 }: { onNav
       let albumsCreatedToday = 0;
       let imagesUploadedToday = 0;
 
-      const fetchedList = (data || []).map(deserializeAlbumFromSupabase);
       fetchedList.forEach((album: any) => {
         totalOnlineAlbums++;
         const spreads = album.spreads || [];

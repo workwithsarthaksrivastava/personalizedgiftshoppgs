@@ -4,6 +4,7 @@ import { Upload, ShoppingCart, Eye, X, ZoomIn, ZoomOut, Move, Search, SlidersHor
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCartStore } from '../cartStore';
 import { supabase } from '../supabase';
+import { fetchAllProductsCached } from '../lib/productsCache';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import html2canvas from 'html2canvas';
@@ -430,11 +431,7 @@ export default function Products() {
         if (supabase.auth.getSession === undefined || (supabase as any).supabaseUrl.includes('placeholder')) {
           throw new Error('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to the Secrets panel.');
         }
-        const { data, error } = await supabase
-          .from('products')
-          .select('*');
-        
-        if (error) throw error;
+        const data = await fetchAllProductsCached();
         
         if (data && data.length > 0) {
           setProducts(data);

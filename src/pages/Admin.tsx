@@ -34,6 +34,7 @@ import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import AdminSlideshows from './AdminSlideshows';
 import AdminCustomers from './AdminCustomers';
+import AdminPSDTemplates from './AdminPSDTemplates';
 
 const ImageAreaSelector = ({ image, area, onChange }: any) => {
   const [mode, setMode] = useState(area?.type || 'rect');
@@ -2391,6 +2392,7 @@ export default function Admin() {
     { name: 'Products', path: '/admin/products', icon: <Package className="w-5 h-5" /> },
     { name: 'Subsections', path: '/admin/subsections', icon: <Layers className="w-5 h-5" /> },
     { name: 'Frame Studio', path: '/admin/frames', icon: <FrameIcon className="w-5 h-5" /> },
+    { name: 'PSD Templates', path: '/admin/psd-templates', icon: <Layers className="w-5 h-5" /> },
     { name: 'Orders', path: '/admin/orders', icon: <ShoppingCart className="w-5 h-5" /> },
     { name: 'Customers', path: '/admin/customers', icon: <Users className="w-5 h-5" /> },
     { name: 'Slideshows', path: '/admin/slideshows', icon: <ImageIcon className="w-5 h-5" /> },
@@ -2460,6 +2462,7 @@ export default function Admin() {
           <Route path="orders" element={<OrdersManagement />} />
           <Route path="customers" element={<AdminCustomers />} />
           <Route path="slideshows" element={<AdminSlideshows />} />
+          <Route path="psd-templates" element={<AdminPSDTemplates />} />
           <Route path="settings" element={<div className="text-muted">Settings (Coming Soon)</div>} />
         </Routes>
       </main>

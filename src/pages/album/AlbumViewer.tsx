@@ -23,53 +23,40 @@ const getThemeStyles = (template: string) => {
 };
 
 const CoverPage = ({ album, theme }: { album: any, theme: any }) => (
-  <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
-    <div className="absolute inset-0 bg-black/40 z-10" />
-    {album.cover_url && <img src={album.cover_url} className="absolute inset-0 w-full h-full object-contain opacity-70 z-0" alt="Cover" referrerPolicy="no-referrer" />}
-    <div className="relative z-20 text-center space-y-2 sm:space-y-4 bg-black/65 p-4 sm:p-8 rounded-xl backdrop-blur-md border border-white/10 shadow-2xl w-11/12 sm:w-5/6 max-w-md">
-      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold drop-shadow-lg" style={{ color: theme.title }}>{album.title}</h1>
-      {album.studio_name && (
-        <p className="text-[10px] sm:text-xs text-white/70 tracking-wider uppercase pt-2 border-t border-white/10">
-          Presented by {album.studio_name}
-        </p>
-      )}
-    </div>
+  <div className="w-full h-full flex items-center justify-center relative overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" style={{ backgroundColor: theme.coverBg }}>
+    {album.cover_url ? (
+      <img 
+        src={album.cover_url} 
+        className="w-full h-full object-contain drop-shadow-md select-none" 
+        alt="Front Cover" 
+        referrerPolicy="no-referrer" 
+      />
+    ) : (
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-zinc-600">
+        <div className="w-14 h-14 rounded-2xl border-2 border-dashed border-zinc-700/50 flex items-center justify-center mb-2">
+          <Sparkles className="w-7 h-7 text-amber-500/40" />
+        </div>
+      </div>
+    )}
   </div>
 );
 
 const BackCover = ({ album, theme }: { album: any, theme: any }) => (
-  <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 relative shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] overflow-hidden" style={{ backgroundColor: theme.coverBg }}>
-    {album.back_cover_url && <img src={album.back_cover_url} className="absolute inset-0 w-full h-full object-contain opacity-40 z-0" alt="Back Cover" referrerPolicy="no-referrer" />}
-    <div className="absolute inset-0 bg-black/50 z-10" />
-    
-    <div className="relative z-20 text-center space-y-4 p-6 sm:p-8 border border-white/10 rounded-2xl bg-black/60 backdrop-blur-md max-w-sm w-11/12">
-      <h2 className="text-xl sm:text-2xl font-bold" style={{ color: theme.title }}>The End</h2>
-      
-      {(album.studio_name || album.photographer_name || album.mobile_number) ? (
-        <div className="space-y-2.5 pt-3 border-t border-white/10 text-left text-xs text-white/85">
-          {album.studio_name && (
-            <div>
-              <span className="text-white/40 block text-[9px] uppercase tracking-wider font-mono">Studio</span>
-              <span className="font-bold text-amber-400">{album.studio_name}</span>
-            </div>
-          )}
-          {album.photographer_name && (
-            <div>
-              <span className="text-white/40 block text-[9px] uppercase tracking-wider font-mono">Photographer</span>
-              <span className="font-semibold text-white/95">{album.photographer_name}</span>
-            </div>
-          )}
-          {album.mobile_number && (
-            <div>
-              <span className="text-white/40 block text-[9px] uppercase tracking-wider font-mono">Contact Info</span>
-              <span className="font-mono text-white/95">{album.mobile_number}</span>
-            </div>
-          )}
+  <div className="w-full h-full flex items-center justify-center relative shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] overflow-hidden" style={{ backgroundColor: theme.coverBg }}>
+    {album.back_cover_url ? (
+      <img 
+        src={album.back_cover_url} 
+        className="w-full h-full object-contain drop-shadow-md select-none" 
+        alt="Back Cover" 
+        referrerPolicy="no-referrer" 
+      />
+    ) : (
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-zinc-600">
+        <div className="w-14 h-14 rounded-2xl border-2 border-dashed border-zinc-700/50 flex items-center justify-center mb-2">
+          <Sparkles className="w-7 h-7 text-amber-500/40" />
         </div>
-      ) : (
-        <p className="text-white/50 text-[8px] sm:text-[10px] tracking-widest uppercase pt-2 border-t border-white/10">Created with PGS Album</p>
-      )}
-    </div>
+      </div>
+    )}
   </div>
 );
 
@@ -278,25 +265,83 @@ export default function AlbumViewer() {
 
   const sheets: any[] = [];
   if (album) {
-    if (!album.spreads || album.spreads.length === 0) {
+    const hasInnerFront = Boolean(album.inner_front_url || (album.is_combined_inner && album.combined_inner_url));
+    const hasInnerBack = Boolean(album.inner_back_url || (album.is_combined_inner && album.combined_inner_url));
+    const innerFrontImg = album.inner_front_url || (album.is_combined_inner ? album.combined_inner_url : '');
+    const innerBackImg = album.inner_back_url || (album.is_combined_inner ? album.combined_inner_url : '');
+    const spreads = album.spreads || [];
+
+    if (spreads.length === 0) {
       sheets.push({
         front: <CoverPage album={album} theme={theme} />,
+        back: hasInnerFront ? (
+          <AlbumPage image={innerFrontImg} pageType="single" marking={album.page_marking} theme={theme} />
+        ) : (
+          <BackCover album={album} theme={theme} />
+        )
+      });
+      if (hasInnerBack) {
+        sheets.push({
+          front: <AlbumPage image={innerBackImg} pageType="single" marking={album.page_marking} theme={theme} />,
+          back: <BackCover album={album} theme={theme} />
+        });
+      }
+    } else if (hasInnerFront || hasInnerBack) {
+      // 1. Cover Sheet (Sheet 0)
+      sheets.push({
+        front: <CoverPage album={album} theme={theme} />,
+        back: hasInnerFront ? (
+          <AlbumPage image={innerFrontImg} pageType="single" marking={album.page_marking} theme={theme} />
+        ) : (
+          <div className="w-full h-full" style={{ backgroundColor: theme.coverBg }} />
+        )
+      });
+
+      // 2. Each spread sheet: Left page on front, Right page on back
+      for (let i = 0; i < spreads.length; i++) {
+        const spread = spreads[i];
+        sheets.push({
+          front: <AlbumPage 
+                   image={spread.leftImage} 
+                   pageType={spread.leftPageType}
+                   canvasImages={spread.leftCanvasImages}
+                   marking={album.page_marking} 
+                   theme={theme} 
+                 />,
+          back: <AlbumPage 
+                  image={spread.rightImage} 
+                  pageType={spread.rightPageType}
+                  canvasImages={spread.rightCanvasImages}
+                  marking={album.page_marking} 
+                  theme={theme} 
+                />
+        });
+      }
+
+      // 3. Back Sheet (Final sheet)
+      sheets.push({
+        front: hasInnerBack ? (
+          <AlbumPage image={innerBackImg} pageType="single" marking={album.page_marking} theme={theme} />
+        ) : (
+          <div className="w-full h-full" style={{ backgroundColor: theme.coverBg }} />
+        ),
         back: <BackCover album={album} theme={theme} />
       });
     } else {
+      // Standard continuous flipbook flow
       sheets.push({
         front: <CoverPage album={album} theme={theme} />,
         back: <AlbumPage 
-                image={album.spreads[0]?.leftImage} 
-                pageType={album.spreads[0]?.leftPageType}
-                canvasImages={album.spreads[0]?.leftCanvasImages}
+                image={spreads[0]?.leftImage} 
+                pageType={spreads[0]?.leftPageType}
+                canvasImages={spreads[0]?.leftCanvasImages}
                 marking={album.page_marking} 
                 theme={theme} 
               />
       });
-      for (let i = 0; i < album.spreads.length; i++) {
-        const currentSpread = album.spreads[i];
-        const nextSpread = album.spreads[i + 1];
+      for (let i = 0; i < spreads.length; i++) {
+        const currentSpread = spreads[i];
+        const nextSpread = spreads[i + 1];
         sheets.push({
           front: <AlbumPage 
                    image={currentSpread.rightImage} 
