@@ -15,16 +15,17 @@ export async function uploadFileToR2(file: File, albumId: string = 'general'): P
   });
 
   if (!res.ok) {
+    const errText = await res.text();
     let errMessage = res.statusText;
     try {
-      const errData = await res.json();
+      const errData = JSON.parse(errText);
       errMessage = errData.message || errMessage;
     } catch (e) {
-      errMessage = await res.text();
+      errMessage = errText || errMessage;
     }
 
     if (errMessage.includes('NOT_FOUND') || errMessage.includes('The page could not be found')) {
-      throw new Error(`Cloudflare R2 Account ID is incorrect. Please ensure you only entered the Account ID (e.g. 1a2b3c...), not a full URL or bucket name.`);
+      throw new Error(`Cloudflare R2 Account ID or Bucket Name is incorrect. Please ensure you only entered the 32-character Account ID (no URLs), and that the Bucket Name matches exactly.`);
     }
 
     throw new Error(`Cloudflare R2 Upload failed: ${errMessage}`);
@@ -64,17 +65,18 @@ export async function uploadBase64ToR2(
   });
 
   if (!res.ok) {
+    const errText = await res.text();
     let errMessage = res.statusText;
     try {
-      const errData = await res.json();
+      const errData = JSON.parse(errText);
       errMessage = errData.message || errMessage;
     } catch (e) {
-      errMessage = await res.text();
+      errMessage = errText || errMessage;
     }
     
     // Check for common Cloudflare 404 / malformed endpoint errors
     if (errMessage.includes('NOT_FOUND') || errMessage.includes('The page could not be found')) {
-      throw new Error(`Cloudflare R2 Account ID is incorrect. Please ensure you only entered the Account ID (e.g. 1a2b3c...), not a full URL or bucket name.`);
+      throw new Error(`Cloudflare R2 Account ID or Bucket Name is incorrect. Please ensure you only entered the 32-character Account ID (no URLs), and that the Bucket Name matches exactly.`);
     }
 
     throw new Error(`Failed to upload to Cloudflare R2: ${errMessage}`);
